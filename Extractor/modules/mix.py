@@ -53,7 +53,7 @@ def decode_base64(encoded_str):
         logger.error(f"Base64 decoding error: {e}")
         return ""
 
-async def fetch_item_details(session, api_base, course_id, item, headers):
+async def fetch_item_details(session, api_base, course_id, item, headers, app_name: str = ""):
     """Fetch details for a single item (video/pdf)."""
     try:
         fi = item.get("id")
@@ -80,7 +80,7 @@ async def fetch_item_details(session, api_base, course_id, item, headers):
             if vl:
                 dvl = decrypt(vl)
                 if dvl:
-                    outputs.append(f"{vt}:{dvl}")
+                    outputs.append(f"[{app_name}] {vt}:{dvl}")
             else:
                 # Process encrypted links
                 for link in data.get("encrypted_links", []):
@@ -91,12 +91,12 @@ async def fetch_item_details(session, api_base, course_id, item, headers):
                         k2 = decode_base64(k1)
                         da = decrypt(a)
                         if da and k2:
-                            outputs.append(f"{vt}:{da}*{k2}")
+                            outputs.append(f"[{app_name}] {vt}:{da}*{k2}")
                             break
                     elif a:
                         da = decrypt(a)
                         if da:
-                            outputs.append(f"{vt}:{da}")
+                            outputs.append(f"[{app_name}] {vt}:{da}")
                             break
 
             # Process additional materials
@@ -111,9 +111,9 @@ async def fetch_item_details(session, api_base, course_id, item, headers):
                         dpk = decrypt(pdf_key)
                         if dp:
                             if dpk == "abcdefg":
-                                outputs.append(f"{vt}:{dp}")
+                                outputs.append(f"[{app_name}] {vt}:{dp}")
                             else:
-                                outputs.append(f"{vt}:{dp}*{dpk}")
+                                outputs.append(f"[{app_name}] {vt}:{dp}*{dpk}")
 
         return outputs
 
@@ -121,7 +121,7 @@ async def fetch_item_details(session, api_base, course_id, item, headers):
         logger.error(f"Error fetching item details: {e}")
         return []
 
-async def fetch_folder_contents(session, api_base, course_id, folder_id, headers):
+async def fetch_folder_contents(session, api_base, course_id, folder_id, headers, app_name: str = ""):
     """Recursively fetch contents of a folder."""
     try:
         outputs = []
@@ -135,10 +135,10 @@ async def fetch_folder_contents(session, api_base, course_id, folder_id, headers
             if "data" in j:
                 for item in j["data"]:
                     # Process individual items
-                    tasks.append(fetch_item_details(session, api_base, course_id, item, headers))
+                    tasks.append(fetch_item_details(session, api_base, course_id, item, headers, app_name))
                     # Recursively process subfolders
                     if item.get("material_type") == "FOLDER":
-                        tasks.append(fetch_folder_contents(session, api_base, course_id, item["id"], headers))
+                        tasks.append(fetch_folder_contents(session, api_base, course_id, item["id"], headers, app_name))
 
             if tasks:
                 results = await asyncio.gather(*tasks)
@@ -184,9 +184,9 @@ async def v2_new(app, message, token, userid, hdr1, app_name, raw_text2, api_bas
                 processed = 0
                 
                 for item in j2["data"]:
-                    tasks.append(fetch_item_details(session, api_base, raw_text2, item, hdr1))
+                    tasks.append(fetch_item_details(session, api_base, raw_text2, item, hdr1, app_name))
                     if item["material_type"] == "FOLDER":
-                        tasks.append(fetch_folder_contents(session, api_base, raw_text2, item["id"], hdr1))
+                        tasks.append(fetch_folder_contents(session, api_base, raw_text2, item["id"], hdr1, app_name))
                     
                     processed += 1
                     if processed % 5 == 0:  # Update progress every 5 items

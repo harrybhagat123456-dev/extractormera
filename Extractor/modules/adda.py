@@ -232,7 +232,7 @@ async def adda_command_handler(app, m):
                                     content_name = safe_get(content, "name", default="Untitled").replace('|', '_').replace('/', '_')
                                     content_url = safe_get(content, "url")
                                     if content_url:
-                                        file.write(f"{content_name}: {content_url}\n")
+                                        file.write(f"[{category.replace('_', ' ').title()}] {content_name}: {content_url}\n")
                                         total_items += 1
 
                         # If no direct content, try child packages
@@ -281,7 +281,7 @@ async def adda_command_handler(app, m):
                                                 pdf_file = safe_get(item, "pdfFileName") or safe_get(item, "pdf")
                                                 if pdf_file:
                                                     pdf_link = f"https://store.adda247.com/{pdf_file}"
-                                                    file.write(f"{item_name}: {pdf_link}\n")
+                                                    file.write(f"[{category.replace('_', ' ').title()}] {item_name}: {pdf_link}\n")
                                                     total_items += 1
 
                                                 # Handle Video URL
@@ -296,7 +296,7 @@ async def adda_command_handler(app, m):
                                                             for line in video_response.split('\n'):
                                                                 if "480p30playlist.m3u8" in line:
                                                                     stream_url = line.replace('/updated', '/demo/updated')
-                                                                    file.write(f"{item_name}: {stream_url}\n")
+                                                                    file.write(f"[{category.replace('_', ' ').title()}] {item_name}: {stream_url}\n")
                                                                     total_items += 1
                                                                     break
                                                     except Exception as e:

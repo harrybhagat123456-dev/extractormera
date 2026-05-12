@@ -294,7 +294,7 @@ async def extract(app, m, appname):
                                         url = video.get('jwplayer_id', '')
                                         if title and url:
                                             url = "https://" + url
-                                            all_urls.append(f"{title}: {url}")
+                                            all_urls.append(f"[{subject_name}] {title}: {url}")
                                             subject_content.append(f"🎬 {title}\n{url}")
                                             total_videos += 1
                             except Exception as e:
@@ -313,7 +313,7 @@ async def extract(app, m, appname):
                                         filename = pdf.get('file_name', '')
                                         if title and filename:
                                             url = "https://kdcampus.live/uploaded/content_data/" + filename
-                                            all_urls.append(f"{title}: {url}")
+                                            all_urls.append(f"[{subject_name}] {title}: {url}")
                                             subject_content.append(f"📄 {title}\n{url}")
                                             total_pdfs += 1
                             except Exception as e:

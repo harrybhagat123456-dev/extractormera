@@ -106,24 +106,25 @@ async def fetch_cpwp_signed_url(url_val: str, name: str, session: aiohttp.Client
     logging.error(f"Failed to fetch signed URL for {name} after {MAX_RETRIES} attempts.")
     return None
 
-async def process_cpwp_url(url_val: str, name: str, session: aiohttp.ClientSession, headers: Dict[str, str]) -> str | None:
+async def process_cpwp_url(url_val: str, name: str, session: aiohttp.ClientSession, headers: Dict[str, str], subject_name: str = "") -> str | None:
     """Process video URLs"""
     try:
+        prefix = f"[{subject_name}] " if subject_name else ""
         if url_val.endswith(('.m3u8', '.mp4', '.mpd')):
-            return f"{name}:{url_val}\n"
+            return f"{prefix}{name}:{url_val}\n"
             
         # For special cases like testbook or drm content
         if "testbook.com" in url_val or "classplusapp.com/drm" in url_val:
-            return f"{name}:{url_val}\n"
+            return f"{prefix}{name}:{url_val}\n"
             
-        return f"{name}:{url_val}\n"
+        return f"{prefix}{name}:{url_val}\n"
         
     except Exception as e:
         logging.error(f"Error processing URL for {name}: {e}")
         return None
 
 
-async def get_cpwp_course_content(session: aiohttp.ClientSession, headers: Dict[str, str], Batch_Token: str, folder_id: int = 0, limit: int = 9999999999, retry_count: int = 0) -> Tuple[List[str], int, int, int]:
+async def get_cpwp_course_content(session: aiohttp.ClientSession, headers: Dict[str, str], Batch_Token: str, folder_id: int = 0, limit: int = 9999999999, retry_count: int = 0, app_name: str = "") -> Tuple[List[str], int, int, int]:
     MAX_RETRIES = 5
     TIMEOUT = 120
     fetched_urls: set[str] = set()
@@ -142,7 +143,7 @@ async def get_cpwp_course_content(session: aiohttp.ClientSession, headers: Dict[
             if res.status == 429:
                 wait_time = min(2 ** retry_count, 30)
                 await asyncio.sleep(wait_time)
-                return await get_cpwp_course_content(session, headers, Batch_Token, folder_id, limit, retry_count + 1)
+                return await get_cpwp_course_content(session, headers, Batch_Token, folder_id, limit, retry_count + 1, app_name=app_name)
                 
             res.raise_for_status()
             res_json = await res.json()
@@ -154,7 +155,7 @@ async def get_cpwp_course_content(session: aiohttp.ClientSession, headers: Dict[
                 
                 for content in chunk:
                     if content['contentType'] == 1:  # Folder
-                        folder_task = asyncio.create_task(get_cpwp_course_content(session, headers, Batch_Token, content['id'], retry_count=0))
+                        folder_task = asyncio.create_task(get_cpwp_course_content(session, headers, Batch_Token, content['id'], retry_count=0, app_name=app_name))
                         folder_tasks.append((content['id'], folder_task))
                     else:
                         name: str = content['name']
@@ -191,13 +192,13 @@ async def get_cpwp_course_content(session: aiohttp.ClientSession, headers: Dict[
                         if url_val.endswith(("master.m3u8", "playlist.m3u8")) and url_val not in fetched_urls:
                             fetched_urls.add(url_val)
                             headers2 = { 'x-access-token': 'eyJjb3Vyc2VJZCI6IjQ1NjY4NyIsInR1dG9ySWQiOm51bGwsIm9yZ0lkIjo0ODA2MTksImNhdGVnb3J5SWQiOm51bGx9'}
-                            task = asyncio.create_task(process_cpwp_url(url_val, name, session, headers2))
+                            task = asyncio.create_task(process_cpwp_url(url_val, name, session, headers2, app_name))
                             content_tasks.append((content['id'], task))
                             video_count += 1
                         else:
                             if url_val:
                                 fetched_urls.add(url_val)
-                                results.append(f"{name}:{url_val}\n")
+                                results.append(f"[{app_name}] {name}:{url_val}\n")
                                 if url_val.endswith('.pdf'):
                                     pdf_count += 1
                                 else:
@@ -210,7 +211,7 @@ async def get_cpwp_course_content(session: aiohttp.ClientSession, headers: Dict[
         if retry_count < MAX_RETRIES:
             wait_time = min(2 ** retry_count, 30)
             await asyncio.sleep(wait_time)
-            return await get_cpwp_course_content(session, headers, Batch_Token, folder_id, limit, retry_count + 1)
+            return await get_cpwp_course_content(session, headers, Batch_Token, folder_id, limit, retry_count + 1, app_name=app_name)
         return [], 0, 0, 0
                                 
     except Exception as e:
@@ -219,7 +220,7 @@ async def get_cpwp_course_content(session: aiohttp.ClientSession, headers: Dict[
             logging.info(f"Retrying folder {folder_id} (Attempt {retry_count + 1}/{MAX_RETRIES})")
             wait_time = min(2 ** retry_count, 30)
             await asyncio.sleep(wait_time)
-            return await get_cpwp_course_content(session, headers, Batch_Token, folder_id, limit, retry_count + 1)
+            return await get_cpwp_course_content(session, headers, Batch_Token, folder_id, limit, retry_count + 1, app_name=app_name)
         else:
             logging.error(f"Failed to retrieve folder {folder_id} after {MAX_RETRIES} retries.")
             return [], 0, 0, 0
@@ -533,7 +534,7 @@ async def process_cpwp(bot: Client, m: Message, user_id: int):
                                 Batch_Token = res_json['data']['hash']
                                 App_Name = res_json['data']['name']
 
-                                course_content, video_count, pdf_count, image_count = await get_cpwp_course_content(session, headers, Batch_Token)
+                                course_content, video_count, pdf_count, image_count = await get_cpwp_course_content(session, headers, Batch_Token, app_name=App_Name)
                                 
                                 if course_content:
                                     # Create individual file for this batch

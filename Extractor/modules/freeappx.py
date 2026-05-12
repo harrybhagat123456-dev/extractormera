@@ -92,8 +92,9 @@ async def fetch_appx_html_to_json(session, url, headers=None, data=None):
         return None
 
 
-async def fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_id, ytFlag, headers, folder_wise_course, user_id):
+async def fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_id, ytFlag, headers, folder_wise_course, user_id, subject_name: str = ""):
     logging.info(f"User ID: {user_id} - Fetching video details for video ID: {video_id}")
+    prefix = f"[{subject_name}] " if subject_name else ""
     try:
         res = await fetch_appx_html_to_json(session, f"{api}/get/fetchVideoDetailsById?course_id={selected_batch_id}&folder_wise_course={folder_wise_course}&ytflag={ytFlag}&video_id={video_id}", headers)
 
@@ -112,7 +113,7 @@ async def fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_
                         path = appx_decrypt(drm_data[0].get("path", "")) if drm_data and isinstance(drm_data, list) and drm_data and drm_data[0].get("path") else None
                             
                         if path:
-                            output.append(f"{Title}:{path}\n")
+                            output.append(f"{prefix}{Title}:{path}\n")
                                 
                 pdf_link = appx_decrypt(data.get("pdf_link", "")) if data.get("pdf_link", "") and appx_decrypt(data.get("pdf_link", "")).endswith(".pdf") else None
 
@@ -121,11 +122,11 @@ async def fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_
                     if is_pdf_encrypted == 1 or is_pdf_encrypted == "1":
                         key = appx_decrypt(data.get("pdf_encryption_key", "")) if data.get("pdf_encryption_key") else None
                         if key:
-                            output.append(f"{Title}:{pdf_link}*{key}\n")
+                            output.append(f"{prefix}{Title}:{pdf_link}*{key}\n")
                         else:
-                            output.append(f"{Title}:{pdf_link}\n")
+                            output.append(f"{prefix}{Title}:{pdf_link}\n")
                     else:
-                        output.append(f"{Title}:{pdf_link}\n")
+                        output.append(f"{prefix}{Title}:{pdf_link}\n")
                         
                 pdf_link2 = appx_decrypt(data.get("pdf_link2", "")) if data.get("pdf_link2", "") and appx_decrypt(data.get("pdf_link2", "")).endswith(".pdf") else None
                     
@@ -134,11 +135,11 @@ async def fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_
                     if is_pdf2_encrypted == 1 or is_pdf2_encrypted == "1":
                         key = appx_decrypt(data.get("pdf2_encryption_key", "")) if data.get("pdf2_encryption_key") else None
                         if key:
-                            output.append(f"{Title}:{pdf_link2}*{key}\n")
+                            output.append(f"{prefix}{Title}:{pdf_link2}*{key}\n")
                         else:
-                            output.append(f"{Title}:{pdf_link2}\n")
+                            output.append(f"{prefix}{Title}:{pdf_link2}\n")
                     else:
-                        output.append(f"{Title}:{pdf_link2}\n")
+                        output.append(f"{prefix}{Title}:{pdf_link2}\n")
 
             else:
                 output.append(f"Did Not Found Course_id : {selected_batch_id} Video_id : {video_id}\n")
@@ -152,8 +153,9 @@ async def fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_
             f"User ID: {user_id} - An error occurred while fetching details for Course_id : {selected_batch_id}, video ID {video_id}: {str(e)}\n"]
 
 
-async def fetch_appx_folder_contents_v2(session, api, selected_batch_id, folder_id, headers, folder_wise_course, user_id):
+async def fetch_appx_folder_contents_v2(session, api, selected_batch_id, folder_id, headers, folder_wise_course, user_id, subject_name: str = ""):
     logging.info(f"User ID: {user_id} - Fetching folder contents for folder ID: {folder_id}")
+    prefix = f"[{subject_name}] " if subject_name else ""
     try:
         res = await fetch_appx_html_to_json(session, f"{api}/get/folder_contentsv2?course_id={selected_batch_id}&parent_id={folder_id}", headers)
         tasks = []
@@ -170,7 +172,7 @@ async def fetch_appx_folder_contents_v2(session, api, selected_batch_id, folder_
                 if material_type == "VIDEO":
                     if video_id:
                         tasks.append(
-                            fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_id, ytFlag, headers, folder_wise_course, user_id))
+                            fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_id, ytFlag, headers, folder_wise_course, user_id, subject_name))
                 
                 elif material_type == "PDF" or material_type == "TEST":
                     pdf_link = appx_decrypt(item.get("pdf_link", "")) if item.get("pdf_link", "") and appx_decrypt(item.get("pdf_link", "")).endswith(".pdf") else None
@@ -180,11 +182,11 @@ async def fetch_appx_folder_contents_v2(session, api, selected_batch_id, folder_
                         if is_pdf_encrypted == 1 or is_pdf_encrypted == "1":
                             key = appx_decrypt(item.get("pdf_encryption_key", "")) if item.get("pdf_encryption_key") else None
                             if key:
-                                output.append(f"{Title} PDF:{pdf_link}*{key}\n")
+                                output.append(f"{prefix}{Title} PDF:{pdf_link}*{key}\n")
                             else:
-                                output.append(f"{Title} PDF:{pdf_link}\n")
+                                output.append(f"{prefix}{Title} PDF:{pdf_link}\n")
                         else:
-                            output.append(f"{Title} PDF:{pdf_link}\n")
+                            output.append(f"{prefix}{Title} PDF:{pdf_link}\n")
                             
                     pdf_link2 = appx_decrypt(item.get("pdf_link2", "")) if item.get("pdf_link2", "") and appx_decrypt(item.get("pdf_link2", "")).endswith(".pdf") else None
                         
@@ -193,19 +195,19 @@ async def fetch_appx_folder_contents_v2(session, api, selected_batch_id, folder_
                         if is_pdf2_encrypted == 1 or is_pdf2_encrypted == "1":
                             key = appx_decrypt(item.get("pdf2_encryption_key", "")) if item.get("pdf2_encryption_key") else None
                             if key:
-                                output.append(f"{Title} PDF2:{pdf_link2}*{key}\n")
+                                output.append(f"{prefix}{Title} PDF2:{pdf_link2}*{key}\n")
                             else:
-                                output.append(f"{Title} PDF2:{pdf_link2}\n")
+                                output.append(f"{prefix}{Title} PDF2:{pdf_link2}\n")
                         else:
-                            output.append(f"{Title} PDF2:{pdf_link2}\n")
+                            output.append(f"{prefix}{Title} PDF2:{pdf_link2}\n")
 
                 elif material_type == "IMAGE":
                     thumbnail = item.get("thumbnail")
                     if thumbnail:
-                        output.append(f"{Title} IMAGE:{thumbnail}\n")
+                        output.append(f"{prefix}{Title} IMAGE:{thumbnail}\n")
                    
                 elif material_type == "FOLDER":
-                    folder_results = await fetch_appx_folder_contents_v2(session, api, selected_batch_id, item.get("id"), headers, folder_wise_course, user_id)
+                    folder_results = await fetch_appx_folder_contents_v2(session, api, selected_batch_id, item.get("id"), headers, folder_wise_course, user_id, subject_name)
                     if folder_results:
                         output.extend(folder_results)
 
@@ -221,8 +223,9 @@ async def fetch_appx_folder_contents_v2(session, api, selected_batch_id, folder_
         return []
 
 
-async def fetch_appx_video_id_details_v3(session, api, selected_batch_id, video_id, ytFlag, headers, user_id):
+async def fetch_appx_video_id_details_v3(session, api, selected_batch_id, video_id, ytFlag, headers, user_id, subject_name: str = ""):
     logging.info(f"User ID: {user_id} - Fetching video details V3 for video ID: {video_id}")
+    prefix = f"[{subject_name}] " if subject_name else ""
     try:
         res = await fetch_appx_html_to_json(session, f"{api}/get/fetchVideoDetailsById?course_id={selected_batch_id}&folder_wise_course=0&ytflag={ytFlag}&video_id={video_id}", headers)
         with open("logs.txt", "a") as log_file:
@@ -243,7 +246,7 @@ async def fetch_appx_video_id_details_v3(session, api, selected_batch_id, video_
                         path = appx_decrypt(drm_data[0].get("path", "")) if drm_data and isinstance(drm_data, list) and drm_data and drm_data[0].get("path") else None
                             
                         if path:
-                            output.append(f"{Title}:{path}\n")
+                            output.append(f"{prefix}{Title}:{path}\n")
                                 
                 pdf_link = appx_decrypt(data.get("pdf_link", "")) if data.get("pdf_link", "") and appx_decrypt(data.get("pdf_link", "")).endswith(".pdf") else None
 
@@ -252,11 +255,11 @@ async def fetch_appx_video_id_details_v3(session, api, selected_batch_id, video_
                     if is_pdf_encrypted == 1 or is_pdf_encrypted == "1":
                         key = appx_decrypt(data.get("pdf_encryption_key", "")) if data.get("pdf_encryption_key") else None
                         if key:
-                            output.append(f"{Title}:{pdf_link}*{key}\n")
+                            output.append(f"{prefix}{Title}:{pdf_link}*{key}\n")
                         else:
-                            output.append(f"{Title}:{pdf_link}\n")
+                            output.append(f"{prefix}{Title}:{pdf_link}\n")
                     else:
-                        output.append(f"{Title}:{pdf_link}\n")
+                        output.append(f"{prefix}{Title}:{pdf_link}\n")
                         
                 pdf_link2 = appx_decrypt(data.get("pdf_link2", "")) if data.get("pdf_link2", "") and appx_decrypt(data.get("pdf_link2", "")).endswith(".pdf") else None
 
@@ -265,11 +268,11 @@ async def fetch_appx_video_id_details_v3(session, api, selected_batch_id, video_
                     if is_pdf2_encrypted == 1 or is_pdf2_encrypted == "1":
                         key = appx_decrypt(data.get("pdf2_encryption_key", "")) if data.get("pdf2_encryption_key") else None
                         if key:
-                            output.append(f"{Title}:{pdf_link2}*{key}\n")
+                            output.append(f"{prefix}{Title}:{pdf_link2}*{key}\n")
                         else:
-                            output.append(f"{Title}:{pdf_link2}\n")
+                            output.append(f"{prefix}{Title}:{pdf_link2}\n")
                     else:
-                        output.append(f"{Title}:{pdf_link2}\n")
+                        output.append(f"{prefix}{Title}:{pdf_link2}\n")
             else:
                 output.append(f"Did Not Found Course_id : {selected_batch_id} Video_id : {video_id}\n")
         else:
@@ -320,6 +323,8 @@ async def process_folder_wise_course_0(session, api, selected_batch_id, headers,
         subjects = res["data"]
         for subject in subjects:
             subjectid = subject.get("subjectid")
+            subject_name = subject.get("subject", "")
+            prefix = f"[{subject_name}] " if subject_name else ""
 
             res2 = await fetch_appx_html_to_json(session, f"{api}/get/alltopicfrmlivecourseclass?courseid={selected_batch_id}&subjectid={subjectid}&start=-1", headers)
             if res2 and "data" in res2:
@@ -346,11 +351,11 @@ async def process_folder_wise_course_0(session, api, selected_batch_id, headers,
                                     if is_pdf_encrypted == 1 or is_pdf_encrypted == "1":
                                         key = appx_decrypt(item.get("pdf_encryption_key"))
                                         if key:
-                                            all_outputs.append(f"{Title}:{pdf_link}*{key}\n")
+                                            all_outputs.append(f"{prefix}{Title}:{pdf_link}*{key}\n")
                                         else:
-                                            all_outputs.append(f"{Title}:{pdf_link}\n")
+                                            all_outputs.append(f"{prefix}{Title}:{pdf_link}\n")
                                     else:
-                                        all_outputs.append(f"{Title}:{pdf_link}\n")
+                                        all_outputs.append(f"{prefix}{Title}:{pdf_link}\n")
                                         
                                 pdf_link2 = appx_decrypt(item.get("pdf_link2", "")) if item.get("pdf_link2", "") and appx_decrypt(item.get("pdf_link2", "")).endswith(".pdf") else None
                                     
@@ -360,21 +365,21 @@ async def process_folder_wise_course_0(session, api, selected_batch_id, headers,
                                     if is_pdf2_encrypted == 1 or is_pdf2_encrypted == "1":
                                         key = appx_decrypt(item.get("pdf2_encryption_key"))
                                         if key:
-                                            all_outputs.append(f"{Title}:{pdf_link2}*{key}\n")
+                                            all_outputs.append(f"{prefix}{Title}:{pdf_link2}*{key}\n")
                                         else:
-                                            all_outputs.append(f"{Title}:{pdf_link2}\n")
+                                            all_outputs.append(f"{prefix}{Title}:{pdf_link2}\n")
                                     else:
-                                        all_outputs.append(f"{Title}:{pdf_link2}\n")
+                                        all_outputs.append(f"{prefix}{Title}:{pdf_link2}\n")
 
                             elif item.get("material_type") == "IMAGE":
                                 thumbnail = item.get("thumbnail")
                                 if thumbnail:
-                                    all_outputs.append(f"{Title}:{thumbnail}\n")
+                                    all_outputs.append(f"{prefix}{Title}:{thumbnail}\n")
                                     
                             elif item.get("material_type") == "VIDEO":
                                 if selected_batch_id is not None and video_id is not None and ytFlag is not None:
                                     tasks.append(
-                                        fetch_appx_video_id_details_v3(session, api, selected_batch_id, video_id, ytFlag, headers, user_id))
+                                        fetch_appx_video_id_details_v3(session, api, selected_batch_id, video_id, ytFlag, headers, user_id, subject_name))
                                 else:
                                     logging.warning(
                                         f"User ID: {user_id} - Skipping video due to None value: course_id={selected_batch_id}, video_id={video_id}, ytflag={ytFlag}")
@@ -392,8 +397,9 @@ async def process_folder_wise_course_0(session, api, selected_batch_id, headers,
 
     return all_outputs
 
-async def process_folder_wise_course_1(session, api, selected_batch_id, headers, user_id):
+async def process_folder_wise_course_1(session, api, selected_batch_id, headers, user_id, subject_name: str = ""):
     logging.info(f"User ID: {user_id} - Processing folder-wise course 1")
+    prefix = f"[{subject_name}] " if subject_name else ""
     res = await fetch_appx_html_to_json(session, f"{api}/get/folder_contentsv2?course_id={selected_batch_id}&parent_id=-1", headers)
     all_outputs = []
     tasks = []
@@ -415,11 +421,11 @@ async def process_folder_wise_course_1(session, api, selected_batch_id, headers,
                     if is_pdf_encrypted == 1 or is_pdf_encrypted == "1":
                         key = appx_decrypt(item.get("pdf_encryption_key"))
                         if key:
-                            all_outputs.append(f"{Title}:{pdf_link}*{key}\n")
+                            all_outputs.append(f"{prefix}{Title}:{pdf_link}*{key}\n")
                         else:
-                            all_outputs.append(f"{Title}:{pdf_link}\n")
+                            all_outputs.append(f"{prefix}{Title}:{pdf_link}\n")
                     else:
-                        all_outputs.append(f"{Title}:{pdf_link}\n")
+                        all_outputs.append(f"{prefix}{Title}:{pdf_link}\n")
                         
                 pdf_link2 = appx_decrypt(item.get("pdf_link2", "")) if item.get("pdf_link2", "") and appx_decrypt(item.get("pdf_link2", "")).endswith(".pdf") else None
                     
@@ -429,23 +435,23 @@ async def process_folder_wise_course_1(session, api, selected_batch_id, headers,
                     if is_pdf2_encrypted == 1 or is_pdf2_encrypted == "1":
                         key = appx_decrypt(item.get("pdf2_encryption_key"))
                         if key:
-                            all_outputs.append(f"{Title}:{pdf_link2}*{key}\n")
+                            all_outputs.append(f"{prefix}{Title}:{pdf_link2}*{key}\n")
                         else:
-                            all_outputs.append(f"{Title}:{pdf_link2}\n")
+                            all_outputs.append(f"{prefix}{Title}:{pdf_link2}\n")
                     else:
-                        all_outputs.append(f"{Title}:{pdf_link2}\n")
+                        all_outputs.append(f"{prefix}{Title}:{pdf_link2}\n")
 
             elif item.get("material_type") == "IMAGE":
                 thumbnail = item.get("thumbnail")
                 if thumbnail:
-                   all_outputs.append(f"{Title}:{thumbnail}\n")
+                   all_outputs.append(f"{prefix}{Title}:{thumbnail}\n")
                    
             elif item.get("material_type") == "VIDEO":
                 tasks.append(
-                    fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_id, ytFlag, headers, 1, user_id))
+                    fetch_appx_video_id_details_v2(session, api, selected_batch_id, video_id, ytFlag, headers, 1, user_id, subject_name))
 
             elif item.get("material_type") == "FOLDER":
-                tasks.append(fetch_appx_folder_contents_v2(session, api, selected_batch_id, item.get("id"), headers, 1, user_id))
+                tasks.append(fetch_appx_folder_contents_v2(session, api, selected_batch_id, item.get("id"), headers, 1, user_id, subject_name))
 
     if tasks:
         results = await asyncio.gather(*tasks)

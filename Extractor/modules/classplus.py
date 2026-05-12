@@ -426,7 +426,7 @@ async def extract_batch(app, message, org_name, batch_id):
                                     # Encode the latter part of the URL
                                     encoded_url = encode_partial_url(video_url)
                                     # Include contentHashId as part of the output
-                                    outputs.append(f"{name}:\n{encoded_url}\ncontentHashId: {content_hash}\n")
+                                    outputs.append(f"[{org_name}] {name}:\n{encoded_url}\ncontentHashId: {content_hash}\n")
                 except Exception as e:
                     print(f"Error fetching live videos: {e}")
 
@@ -457,7 +457,7 @@ async def extract_batch(app, message, org_name, batch_id):
                         encoded_url = encode_partial_url(video_url)
                         if content_hash:
                             encoded_url += f"*UGxCP_hash={content_hash}\n"
-                        full_info = f"{folder_path}{sub_name}: {encoded_url}"
+                        full_info = f"[{org_name}] {folder_path}{sub_name}: {encoded_url}"
                         result.append(full_info)
 
                 elif content_type == "1":  # Folder

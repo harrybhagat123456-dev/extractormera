@@ -234,7 +234,7 @@ Send batch ID to start extraction...
                             name = link.get_text(strip=True)
                             url = link.get("href")
                             if url:
-                                self.video_urls.append(f"{name}: {url}")
+                                self.video_urls.append(f"[{batch_name}] {name}: {url}")
                     else:
                         await self.send_message(f"""
 ⚠️ <b>Section Error</b>

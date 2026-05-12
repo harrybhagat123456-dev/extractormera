@@ -47,7 +47,7 @@ async def fetch_pwwp_data(session: aiohttp.ClientSession, url: str, headers: Dic
             return None
 
 
-async def process_pwwp_chapter_content(session: aiohttp.ClientSession, chapter_id, selected_batch_id, subject_id, schedule_id, content_type, headers: Dict):
+async def process_pwwp_chapter_content(session: aiohttp.ClientSession, chapter_id, selected_batch_id, subject_id, schedule_id, content_type, headers: Dict, subject_name: str = ""):
     url = f"https://api.penpencil.co/v1/batches/{selected_batch_id}/subject/{subject_id}/schedule/{schedule_id}/schedule-details"
     data = await fetch_pwwp_data(session, url, headers=headers)
     content = []
@@ -63,7 +63,8 @@ async def process_pwwp_chapter_content(session: aiohttp.ClientSession, chapter_i
             #    image = video_details.get('image', "")
 
                 if videoUrl:
-                    line = f"{name}:{videoUrl}"
+                    prefix = f"[{subject_name}] " if subject_name else ""
+                    line = f"{prefix}{name}:{videoUrl}"
                     content.append(line)
                #     logging.info(line)
 
@@ -75,7 +76,8 @@ async def process_pwwp_chapter_content(session: aiohttp.ClientSession, chapter_i
                 for attachment in attachment_ids:
                     url = attachment.get('baseUrl', '') + attachment.get('key', '')
                     if url:
-                        line = f"{name}:{url}"
+                        prefix = f"[{subject_name}] " if subject_name else ""
+                        line = f"{prefix}{name}:{url}"
                         content.append(line)
                     #    logging.info(line)
 
@@ -107,7 +109,7 @@ async def fetch_pwwp_all_schedule(session: aiohttp.ClientSession, chapter_id, se
     return all_schedule
 
 
-async def process_pwwp_chapters(session: aiohttp.ClientSession, chapter_id, selected_batch_id, subject_id, headers: Dict):
+async def process_pwwp_chapters(session: aiohttp.ClientSession, chapter_id, selected_batch_id, subject_id, headers: Dict, subject_name: str = ""):
     content_types = ['videos', 'notes', 'DppNotes', 'DppVideos']
     
     all_schedule_tasks = [fetch_pwwp_all_schedule(session, chapter_id, selected_batch_id, subject_id, content_type, headers) for content_type in content_types]
@@ -118,7 +120,7 @@ async def process_pwwp_chapters(session: aiohttp.ClientSession, chapter_id, sele
         all_schedule.extend(schedule)
         
     content_tasks = [
-        process_pwwp_chapter_content(session, chapter_id, selected_batch_id, subject_id, item["_id"], item['content_type'], headers)
+        process_pwwp_chapter_content(session, chapter_id, selected_batch_id, subject_id, item["_id"], item['content_type'], headers, subject_name)
         for item in all_schedule
     ]
     content_results = await asyncio.gather(*content_tasks)
@@ -165,7 +167,7 @@ async def process_pwwp_subject(session: aiohttp.ClientSession, subject: Dict, se
         zipf.writestr(f"{subject_name}/{chapter_name}/", "")
         json_data[selected_batch_name][subject_name][chapter_name] = {}
 
-        chapter_tasks.append(process_pwwp_chapters(session, chapter["_id"], selected_batch_id, subject_id, headers))
+        chapter_tasks.append(process_pwwp_chapters(session, chapter["_id"], selected_batch_id, subject_id, headers, subject_name))
 
     chapter_results = await asyncio.gather(*chapter_tasks)
 
@@ -203,7 +205,7 @@ def find_pw_old_batch(batch_search):
 
     return matching_batches
 
-async def get_pwwp_todays_schedule_content_details(session: aiohttp.ClientSession, selected_batch_id, subject_id, schedule_id, headers: Dict) -> List[str]:
+async def get_pwwp_todays_schedule_content_details(session: aiohttp.ClientSession, selected_batch_id, subject_id, schedule_id, headers: Dict, subject_name: str = "") -> List[str]:
 
     url = f"https://api.penpencil.co/v1/batches/{selected_batch_id}/subject/{subject_id}/schedule/{schedule_id}/schedule-details"
     data = await fetch_pwwp_data(session, url, headers)
@@ -220,7 +222,8 @@ async def get_pwwp_todays_schedule_content_details(session: aiohttp.ClientSessio
             image = video_details.get('image')
                 
             if videoUrl:
-                line = f"{name}:{videoUrl}\n"
+                prefix = f"[{subject_name}] " if subject_name else ""
+                line = f"{prefix}{name}:{videoUrl}\n"
                 content.append(line)
            #     logging.info(line)
                
@@ -234,7 +237,8 @@ async def get_pwwp_todays_schedule_content_details(session: aiohttp.ClientSessio
                 url = attachment.get('baseUrl', '') + attachment.get('key', '')
                         
                 if url:
-                    line = f"{name}:{url}\n"
+                    prefix = f"[{subject_name}] " if subject_name else ""
+                    line = f"{prefix}{name}:{url}\n"
                     content.append(line)
                 #    logging.info(line)
                 
@@ -249,7 +253,8 @@ async def get_pwwp_todays_schedule_content_details(session: aiohttp.ClientSessio
                     url = attachment.get('baseUrl', '') + attachment.get('key', '')
                         
                     if url:
-                        line = f"{name}:{url}\n"
+                        prefix = f"[{subject_name}] " if subject_name else ""
+                        line = f"{prefix}{name}:{url}\n"
                         content.append(line)
                     #    logging.info(line)
     else:
@@ -269,7 +274,7 @@ async def get_pwwp_all_todays_schedule_content(session: aiohttp.ClientSession, s
             schedule_id = item.get('_id')
             subject_id = item.get('batchSubjectId')
             
-            task = asyncio.create_task(get_pwwp_todays_schedule_content_details(session, selected_batch_id, subject_id, schedule_id, headers))
+            task = asyncio.create_task(get_pwwp_todays_schedule_content_details(session, selected_batch_id, subject_id, schedule_id, headers, ""))
             tasks.append(task)
             
         results = await asyncio.gather(*tasks)
