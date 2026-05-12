@@ -28,7 +28,7 @@ async def fetch_content(session, url, headers) -> dict:
     async with session.get(url, headers=headers) as response:
         return await response.json()
 
-async def process_subject_content(session, target_id, subject_id, headers, all_links: List[str], total_links: List[int]):
+async def process_subject_content(session, target_id, subject_id, headers, all_links: List[str], total_links: List[int], subject_name: str = ""):
     tasks = []
     for page in range(1, 12):
         url = f"https://api.penpencil.co/v2/batches/{target_id}/subject/{subject_id}/contents?page={page}&contentType=exercises-notes-videos"
@@ -53,11 +53,11 @@ async def process_subject_content(session, target_id, subject_id, headers, all_l
                 if url:
                     if '.mpd' in url:
                         final_url, parent_id, child_id = extract_mpd_info(url, content_id, target_id)
-                        line = format_content_line(topic, final_url, content_type, parent_id, child_id)
+                        line = format_content_line(topic, final_url, subject_name, parent_id, child_id)
                         all_links.append(line)
                         total_links[0] += 1
                     else:
-                        line = format_content_line(topic, url, content_type)
+                        line = format_content_line(topic, url, subject_name)
                         all_links.append(line)
                         total_links[0] += 1
 
@@ -72,11 +72,11 @@ async def process_subject_content(session, target_id, subject_id, headers, all_l
                                 full_url = f"{base_url}{key}"
                                 if '.mpd' in full_url:
                                     final_url, parent_id, child_id = extract_mpd_info(full_url, hw_id, target_id)
-                                    line = format_content_line(name, final_url, "notes", parent_id, child_id)
+                                    line = format_content_line(name, final_url, subject_name, parent_id, child_id)
                                     all_links.append(line)
                                     total_links[0] += 1
                                 else:
-                                    line = format_content_line(name, full_url, "notes")
+                                    line = format_content_line(name, full_url, subject_name)
                                     all_links.append(line)
                                     total_links[0] += 1
                         except Exception as e:
@@ -110,10 +110,10 @@ def clean_text(text):
     text = text.replace(":", "_").replace("/", "_").replace("|", "_").replace("\\", "_")
     return text
 
-def format_content_line(name, url, content_type="", parent_id=None, child_id=None):
-    """Format content line with modern design and metadata"""
+def format_content_line(name, url, subject_name="", parent_id=None, child_id=None):
+    """Format content line with subject name as prefix instead of content type"""
     name = clean_text(name)
-    prefix = f"[{content_type}] " if content_type else ""
+    prefix = f"[{subject_name}] " if subject_name else ""
     
     if parent_id and child_id:
         return f"{prefix}{name}:{url}&parentId={parent_id}&childId={child_id}"
@@ -280,7 +280,7 @@ async def pw_login(app, message):
                 all_subjects_progress[sn] = False
                 await update_progress()
                 
-                task = process_subject_content(session, target_id, si, headers, all_links, total_links)
+                task = process_subject_content(session, target_id, si, headers, all_links, total_links, sn)
                 tasks.append(task)
             
             await asyncio.gather(*tasks)
