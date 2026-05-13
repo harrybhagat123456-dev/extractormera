@@ -47,6 +47,61 @@ def sort_lines_by_date(lines):
         return _dt.min
     return sorted(lines, key=_extract_sort_date)
 
+def sort_and_group_by_subject(lines):
+    """Group lines by [subject] prefix, sort subjects by earliest date (ascending),
+    sort lines within each subject by date (ascending). Oldest subject first."""
+    import re as _re
+    from datetime import datetime as _dt
+
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+
+    # Group by subject from [SubjectName] prefix
+    subject_groups = {}
+    subject_order = []
+    for line in lines:
+        match = _re.match(r'\[([^\]]+)\]', line)
+        if match:
+            subject = match.group(1)
+        else:
+            subject = "General"
+        if subject not in subject_groups:
+            subject_groups[subject] = []
+            subject_order.append(subject)
+        subject_groups[subject].append(line)
+
+    # Sort lines within each subject by date (ascending = oldest first)
+    for subject in subject_groups:
+        subject_groups[subject] = sorted(subject_groups[subject], key=_extract_sort_date)
+
+    # Sort subjects by their earliest date (ascending = oldest subject first)
+    def _subject_earliest_date(subject):
+        dates = [_extract_sort_date(line) for line in subject_groups[subject]]
+        return min(dates) if dates else _dt.min
+
+    sorted_subjects = sorted(subject_order, key=_subject_earliest_date)
+
+    # Concatenate groups
+    result = []
+    for subject in sorted_subjects:
+        result.extend(subject_groups[subject])
+
+    return result
+
+
 
 def extract_date(item):
     """Extract and format date from API response item"""
@@ -535,13 +590,36 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                         
                         # Sort by date in ascending order (oldest first)
                         for sn in all_subject_urls:
-                            all_subject_urls[sn] = sort_lines_by_date(all_subject_urls[sn])
+                            all_subject_urls[sn] = sort_and_group_by_subject(all_subject_urls[sn])
+                        
+                        # Sort subjects by their earliest date (ascending = oldest subject first)
+                        def _subject_earliest_date(subj_name):
+                            import re as _re
+                            from datetime import datetime as _dt
+                            lines = all_subject_urls.get(subj_name, [])
+                            if not lines:
+                                return _dt.min
+                            for line in lines:
+                                match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+                                if match:
+                                    try:
+                                        return _dt.strptime(match.group(0), '%Y-%m-%d')
+                                    except:
+                                        pass
+                                match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+                                if match:
+                                    try:
+                                        day, month, year = match.group(1), match.group(2), match.group(3)
+                                        return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+                                    except:
+                                        pass
+                            return _dt.min
+                        
+                        sorted_subjects = sorted(all_subject_urls.keys(), key=_subject_earliest_date)
                         
                         with open(f"{clean_file_name}.txt", 'w', encoding='utf-8') as f:
-                            for subject in subjects:
-                                subject_name = subject.get("subject", "Unknown Subject").replace("/", "-")
-                                if subject_name in all_subject_urls:
-                                    f.write('\n'.join(all_subject_urls[subject_name]) + '\n')
+                            for subject_name in sorted_subjects:
+                                f.write('\n'.join(all_subject_urls[subject_name]) + '\n')
 
                     else:
                         raise Exception(f"Error fetching batch details: {batch_details.get('message')}")
@@ -552,7 +630,7 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                     today_schedule = await get_pwwp_all_todays_schedule_content(session, selected_batch_id, headers)
                     if today_schedule:
                         # Sort by date in ascending order (oldest first)
-                        today_schedule = sort_lines_by_date(today_schedule)
+                        today_schedule = sort_and_group_by_subject(today_schedule)
                         with open(f"{clean_file_name}.txt", "w", encoding="utf-8") as f:
                             f.writelines(today_schedule)
                     else:

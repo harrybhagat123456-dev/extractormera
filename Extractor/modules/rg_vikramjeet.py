@@ -28,6 +28,61 @@ def sort_lines_by_date(lines):
         return _dt.min
     return sorted(lines, key=_extract_sort_date)
 
+def sort_and_group_by_subject(lines):
+    """Group lines by [subject] prefix, sort subjects by earliest date (ascending),
+    sort lines within each subject by date (ascending). Oldest subject first."""
+    import re as _re
+    from datetime import datetime as _dt
+
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+
+    # Group by subject from [SubjectName] prefix
+    subject_groups = {}
+    subject_order = []
+    for line in lines:
+        match = _re.match(r'\[([^\]]+)\]', line)
+        if match:
+            subject = match.group(1)
+        else:
+            subject = "General"
+        if subject not in subject_groups:
+            subject_groups[subject] = []
+            subject_order.append(subject)
+        subject_groups[subject].append(line)
+
+    # Sort lines within each subject by date (ascending = oldest first)
+    for subject in subject_groups:
+        subject_groups[subject] = sorted(subject_groups[subject], key=_extract_sort_date)
+
+    # Sort subjects by their earliest date (ascending = oldest subject first)
+    def _subject_earliest_date(subject):
+        dates = [_extract_sort_date(line) for line in subject_groups[subject]]
+        return min(dates) if dates else _dt.min
+
+    sorted_subjects = sorted(subject_order, key=_subject_earliest_date)
+
+    # Concatenate groups
+    result = []
+    for subject in sorted_subjects:
+        result.extend(subject_groups[subject])
+
+    return result
+
+
 def extract_date(item):
     """Extract and format date from API response item"""
     for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
@@ -127,6 +182,9 @@ async def rgvikramjeet(bot: Client, m: Message):
         input3 = await bot.listen(m.chat.id)
         selected_subject = input3.text.strip()
 
+        # Get selected subject name for prefix
+        selected_subject_name = next((subj.get("subject_name", "Unknown") for subj in subjects if subj.get("id") == selected_subject), "Unknown Subject")
+
         # Get topics
         topics_url = f"https://appapi.videocrypt.in/data_model/courses/subjects/topics?subjectId={selected_subject}&courseId={selected_course}"
         res_topics = requests.get(topics_url, headers=auth_headers)
@@ -165,13 +223,13 @@ async def rgvikramjeet(bot: Client, m: Message):
                         cipher = AES.new(key, AES.MODE_CBC, iv)
                         plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
                         decrypted_link = plaintext.decode('utf-8')
-                        vid_date = extract_date(video); date_str = f"{vid_date} " if vid_date else ""; download_links.append(f"{date_str}{title}: {decrypted_link}")
+                        vid_date = extract_date(video); date_str = f"{vid_date} " if vid_date else ""; download_links.append(f"[{selected_subject_name}] {date_str}{title}: {decrypted_link}")
                     except Exception as e:
                         download_links.append(f"{title}: Failed to decrypt")
 
         filename = f"Rgvikramjeet_{selected_course}.txt"
         # Sort by date in ascending order (oldest first)
-        download_links = sort_lines_by_date(download_links)
+        download_links = sort_and_group_by_subject(download_links)
         with open(filename, 'w') as f:
             for line in download_links:
                 f.write(f"{line}\n")

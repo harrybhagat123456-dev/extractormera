@@ -40,6 +40,61 @@ def sort_lines_by_date(lines):
         return _dt.min
     return sorted(lines, key=_extract_sort_date)
 
+def sort_and_group_by_subject(lines):
+    """Group lines by [subject] prefix, sort subjects by earliest date (ascending),
+    sort lines within each subject by date (ascending). Oldest subject first."""
+    import re as _re
+    from datetime import datetime as _dt
+
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+
+    # Group by subject from [SubjectName] prefix
+    subject_groups = {}
+    subject_order = []
+    for line in lines:
+        match = _re.match(r'\[([^\]]+)\]', line)
+        if match:
+            subject = match.group(1)
+        else:
+            subject = "General"
+        if subject not in subject_groups:
+            subject_groups[subject] = []
+            subject_order.append(subject)
+        subject_groups[subject].append(line)
+
+    # Sort lines within each subject by date (ascending = oldest first)
+    for subject in subject_groups:
+        subject_groups[subject] = sorted(subject_groups[subject], key=_extract_sort_date)
+
+    # Sort subjects by their earliest date (ascending = oldest subject first)
+    def _subject_earliest_date(subject):
+        dates = [_extract_sort_date(line) for line in subject_groups[subject]]
+        return min(dates) if dates else _dt.min
+
+    sorted_subjects = sorted(subject_order, key=_subject_earliest_date)
+
+    # Concatenate groups
+    result = []
+    for subject in sorted_subjects:
+        result.extend(subject_groups[subject])
+
+    return result
+
+
 
 # Download thumbnail
 def download_thumbnail(url):
@@ -145,7 +200,7 @@ async def careerdl(app, message, headers, raw_text2, token, raw_text3, prog, nam
                 else:
                     continue
 
-                vid_date = extract_date(video_data); date_str = f"{vid_date} " if vid_date else ""; result_text += f"{date_str}{lesson_name}: {video_link}\n"
+                vid_date = extract_date(video_data); date_str = f"{vid_date} " if vid_date else ""; result_text += f"[{current_topic_name}] {date_str}{lesson_name}: {video_link}\n"
 
             # Notes
             notes_url = f"https://elearn.crwilladmin.com/api/v9/batch-topic/{raw_text2}?type=notes"
@@ -159,7 +214,7 @@ async def careerdl(app, message, headers, raw_text2, token, raw_text3, prog, nam
                     for note in reversed(notes_data.get('data', {}).get('notesDetails', [])):
                         doc_title = note.get('docTitle', '')
                         doc_url = note.get('docUrl', '').replace(' ', '%20')
-                        note_date = extract_date(note); date_str = f"{note_date} " if note_date else ""; line = f"{date_str}{doc_title}: {doc_url}\n"
+                        note_date = extract_date(note); date_str = f"{note_date} " if note_date else ""; line = f"[{current_topic_name}] {date_str}{doc_title}: {doc_url}\n"
                         if line not in result_text:
                             result_text += line
                             total_notes += 1
@@ -174,7 +229,7 @@ async def careerdl(app, message, headers, raw_text2, token, raw_text3, prog, nam
 
     file_name = f"{name.replace('/', '')}.txt"
     # Sort by date in ascending order (oldest first)
-    result_lines = sort_lines_by_date(result_text.splitlines())
+    result_lines = sort_and_group_by_subject(result_text.splitlines())
     with open(file_name, 'w', encoding='utf-8') as f:
         f.write('\n'.join(result_lines))
 

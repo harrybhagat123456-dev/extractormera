@@ -38,6 +38,61 @@ def sort_lines_by_date(lines):
         return _dt.min
     return sorted(lines, key=_extract_sort_date)
 
+def sort_and_group_by_subject(lines):
+    """Group lines by [subject] prefix, sort subjects by earliest date (ascending),
+    sort lines within each subject by date (ascending). Oldest subject first."""
+    import re as _re
+    from datetime import datetime as _dt
+
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+
+    # Group by subject from [SubjectName] prefix
+    subject_groups = {}
+    subject_order = []
+    for line in lines:
+        match = _re.match(r'\[([^\]]+)\]', line)
+        if match:
+            subject = match.group(1)
+        else:
+            subject = "General"
+        if subject not in subject_groups:
+            subject_groups[subject] = []
+            subject_order.append(subject)
+        subject_groups[subject].append(line)
+
+    # Sort lines within each subject by date (ascending = oldest first)
+    for subject in subject_groups:
+        subject_groups[subject] = sorted(subject_groups[subject], key=_extract_sort_date)
+
+    # Sort subjects by their earliest date (ascending = oldest subject first)
+    def _subject_earliest_date(subject):
+        dates = [_extract_sort_date(line) for line in subject_groups[subject]]
+        return min(dates) if dates else _dt.min
+
+    sorted_subjects = sorted(subject_order, key=_subject_earliest_date)
+
+    # Concatenate groups
+    result = []
+    for subject in sorted_subjects:
+        result.extend(subject_groups[subject])
+
+    return result
+
+
 def extract_date(item):
     """Extract and format date from API response item"""
     for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
@@ -266,7 +321,7 @@ async def exampur_txt(app, message):
                         title = material.get('title', '')
                         url = material.get('video_link', '')
                         if url:
-                            mat_date = extract_date(material); date_str = f"{mat_date} " if mat_date else ""; all_urls.append(f"{date_str}{title}:{url}")
+                            mat_date = extract_date(material); date_str = f"{mat_date} " if mat_date else ""; all_urls.append(f"[{chapter_name}] {date_str}{title}:{url}")
 
                 processed += 1
 
@@ -288,7 +343,7 @@ async def exampur_txt(app, message):
             # Create and save file
             file_name = f"Exampur_{batch_id}_{int(start_time.timestamp())}.txt"
             # Sort by date in ascending order (oldest first)
-            all_urls = sort_lines_by_date(all_urls)
+            all_urls = sort_and_group_by_subject(all_urls)
             with open(file_name, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(all_urls))
 
