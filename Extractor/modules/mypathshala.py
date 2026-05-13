@@ -14,6 +14,29 @@ from Extractor.core.utils import forward_to_log
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 @app.on_message(filters.command(["my"]))
 async def my_pathshala_login(app, message):
     try:
@@ -144,14 +167,14 @@ async def my_pathshala_login(app, message):
                             for video in videos:
                                 title = video['title']
                                 link = f"https://www.youtube.com/watch?v={video['video']}"
-                                all_urls.append(f"{title}:{link}")
+                                vid_date = extract_date(video); date_str = f"{vid_date} " if vid_date else ""; all_urls.append(f"{date_str}{title}:{link}")
 
                             # Process assignments/PDFs
                             assignments = cdata['course'].get('assignments', [])
                             for pdf in assignments:
                                 title = pdf['assignment_name']
                                 link = f"https://mps.sgp1.digitaloceanspaces.com/prod/docs/courses/{pdf['document']}"
-                                all_urls.append(f"{title}:{link}")
+                                pdf_date = extract_date(pdf); date_str = f"{pdf_date} " if pdf_date else ""; all_urls.append(f"{date_str}{title}:{link}")
 
                             if not all_urls:
                                 await progress_msg.edit_text("❌ <b>No content found in this batch</b>")

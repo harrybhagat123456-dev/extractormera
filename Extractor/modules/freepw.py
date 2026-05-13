@@ -25,6 +25,30 @@ time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
 THREADPOOL = ThreadPoolExecutor(max_workers=5000)
 
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
+
 
 
 
@@ -54,6 +78,8 @@ async def process_pwwp_chapter_content(session: aiohttp.ClientSession, chapter_i
 
     if data and data.get("success") and data.get("data"):
         data_item = data["data"]
+        item_date = extract_date(data_item)
+        date_str = f"{item_date} " if item_date else ""
 
         if content_type in ("videos", "DppVideos"):
             video_details = data_item.get('videoDetails', {})
@@ -64,7 +90,7 @@ async def process_pwwp_chapter_content(session: aiohttp.ClientSession, chapter_i
 
                 if videoUrl:
                     prefix = f"[{subject_name}] " if subject_name else ""
-                    line = f"{prefix}{name}:{videoUrl}"
+                    line = f"{prefix}{date_str}{name}:{videoUrl}"
                     content.append(line)
                #     logging.info(line)
 
@@ -77,7 +103,7 @@ async def process_pwwp_chapter_content(session: aiohttp.ClientSession, chapter_i
                     url = attachment.get('baseUrl', '') + attachment.get('key', '')
                     if url:
                         prefix = f"[{subject_name}] " if subject_name else ""
-                        line = f"{prefix}{name}:{url}"
+                        line = f"{prefix}{date_str}{name}:{url}"
                         content.append(line)
                     #    logging.info(line)
 
@@ -213,6 +239,8 @@ async def get_pwwp_todays_schedule_content_details(session: aiohttp.ClientSessio
 
     if data and data.get("success") and data.get("data"):
         data_item = data["data"]
+        item_date = extract_date(data_item)
+        date_str = f"{item_date} " if item_date else ""
         
         video_details = data_item.get('videoDetails', {})
         if video_details:
@@ -223,7 +251,7 @@ async def get_pwwp_todays_schedule_content_details(session: aiohttp.ClientSessio
                 
             if videoUrl:
                 prefix = f"[{subject_name}] " if subject_name else ""
-                line = f"{prefix}{name}:{videoUrl}\n"
+                line = f"{prefix}{date_str}{name}:{videoUrl}\n"
                 content.append(line)
            #     logging.info(line)
                
@@ -238,7 +266,7 @@ async def get_pwwp_todays_schedule_content_details(session: aiohttp.ClientSessio
                         
                 if url:
                     prefix = f"[{subject_name}] " if subject_name else ""
-                    line = f"{prefix}{name}:{url}\n"
+                    line = f"{prefix}{date_str}{name}:{url}\n"
                     content.append(line)
                 #    logging.info(line)
                 
@@ -254,7 +282,7 @@ async def get_pwwp_todays_schedule_content_details(session: aiohttp.ClientSessio
                         
                     if url:
                         prefix = f"[{subject_name}] " if subject_name else ""
-                        line = f"{prefix}{name}:{url}\n"
+                        line = f"{prefix}{date_str}{name}:{url}\n"
                         content.append(line)
                     #    logging.info(line)
     else:

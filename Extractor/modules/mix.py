@@ -53,6 +53,29 @@ def decode_base64(encoded_str):
         logger.error(f"Base64 decoding error: {e}")
         return ""
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 async def fetch_item_details(session, api_base, course_id, item, headers, app_name: str = ""):
     """Fetch details for a single item (video/pdf)."""
     try:
@@ -70,6 +93,8 @@ async def fetch_item_details(session, api_base, course_id, item, headers, app_na
 
             r4 = await response.json()
             data = r4.get("data")
+            date = extract_date(data) if data else ""
+            date_str = f"{date} " if date else ""
             if not data:
                 return []
 
@@ -80,7 +105,7 @@ async def fetch_item_details(session, api_base, course_id, item, headers, app_na
             if vl:
                 dvl = decrypt(vl)
                 if dvl:
-                    outputs.append(f"[{app_name}] {vt}:{dvl}")
+                    outputs.append(f"[{app_name}] {date_str}{vt}:{dvl}")
             else:
                 # Process encrypted links
                 for link in data.get("encrypted_links", []):
@@ -91,12 +116,12 @@ async def fetch_item_details(session, api_base, course_id, item, headers, app_na
                         k2 = decode_base64(k1)
                         da = decrypt(a)
                         if da and k2:
-                            outputs.append(f"[{app_name}] {vt}:{da}*{k2}")
+                            outputs.append(f"[{app_name}] {date_str}{vt}:{da}*{k2}")
                             break
                     elif a:
                         da = decrypt(a)
                         if da:
-                            outputs.append(f"[{app_name}] {vt}:{da}")
+                            outputs.append(f"[{app_name}] {date_str}{vt}:{da}")
                             break
 
             # Process additional materials
@@ -111,9 +136,9 @@ async def fetch_item_details(session, api_base, course_id, item, headers, app_na
                         dpk = decrypt(pdf_key)
                         if dp:
                             if dpk == "abcdefg":
-                                outputs.append(f"[{app_name}] {vt}:{dp}")
+                                outputs.append(f"[{app_name}] {date_str}{vt}:{dp}")
                             else:
-                                outputs.append(f"[{app_name}] {vt}:{dp}*{dpk}")
+                                outputs.append(f"[{app_name}] {date_str}{vt}:{dp}*{dpk}")
 
         return outputs
 

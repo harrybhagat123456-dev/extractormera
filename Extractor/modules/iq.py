@@ -12,6 +12,29 @@ from datetime import datetime
 import pytz
 from Extractor.core.utils import forward_to_log
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 
 async def fetchs(url, json=None, headers=None):
     async with aiohttp.ClientSession() as session:
@@ -221,10 +244,9 @@ async def handle_iq_logic(app, m):
                                 url = video_item.get('videoUrl')
                                 name = video_item.get('name')
                                 if url is not None:
-                                    if url.endswith(".mpd"):
-                                        cc = f"[{topicname}]-{name}:{url}"
-                                    else:
-                                        cc = f"[{topicname}]-{name}:{url}"
+                                    vid_date = extract_date(video_item)
+                                    date_str = f"{vid_date} " if vid_date else ""
+                                    cc = f"[{topicname}] {date_str}{name}:{url}"
                                     
                                     all_urls.append(cc)
                                 contentIdy = video_item.get('contentId')
@@ -235,7 +257,9 @@ async def handle_iq_logic(app, m):
                                             if 'name' in url_data:
                                                 name = url_data['name']
                                                 url = url_data['url']
-                                                cc = f"[Notes] - {name}: {url}"
+                                                note_date = extract_date(url_data) if isinstance(url_data, dict) else ""
+                                                date_str = f"{note_date} " if note_date else ""
+                                                cc = f"[Notes] {date_str}{name}: {url}"
                                             
                                                 all_urls.append(cc)
 
@@ -250,10 +274,9 @@ async def handle_iq_logic(app, m):
                                     url = video_item.get('videoUrl')
                                     name = video_item.get('name')
                                     if url is not None:
-                                        if url.endswith(".mpd"):
-                                            cc = f"[{course_title}]-{name}:{url}"
-                                        else:
-                                            cc = f"[{course_title}]-{name}:{url}"
+                                        vid_date = extract_date(video_item)
+                                        date_str = f"{vid_date} " if vid_date else ""
+                                        cc = f"[{course_title}] {date_str}{name}:{url}"
                                     
                                         all_urls.append(cc)
                                     contentIdx = video_item.get('contentId')
@@ -264,7 +287,9 @@ async def handle_iq_logic(app, m):
                                                 if 'name' in url_data:
                                                     name = url_data['name']
                                                     url = url_data['url']
-                                                    cc = f"[Notes] - {name}: {url}"    
+                                                    note_date = extract_date(url_data) if isinstance(url_data, dict) else ""
+                                                    date_str = f"{note_date} " if note_date else ""
+                                                    cc = f"[Notes] {date_str}{name}: {url}"    
                                                     all_urls.append(cc)
                     await progress_msg.edit('**URL Writing Successfull**')
                     await progress_msg.delete()

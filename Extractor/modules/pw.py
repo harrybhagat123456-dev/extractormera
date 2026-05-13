@@ -50,19 +50,21 @@ async def process_subject_content(session, target_id, subject_id, headers, all_l
                 if item.get("lectureType"):
                     content_type = item.get("lectureType").lower()
                 
+                date = extract_date(item)
                 if url:
                     if '.mpd' in url:
                         final_url, parent_id, child_id = extract_mpd_info(url, content_id, target_id)
-                        line = format_content_line(topic, final_url, subject_name, parent_id, child_id)
+                        line = format_content_line(topic, final_url, subject_name, parent_id, child_id, date)
                         all_links.append(line)
                         total_links[0] += 1
                     else:
-                        line = format_content_line(topic, url, subject_name)
+                        line = format_content_line(topic, url, subject_name, date=date)
                         all_links.append(line)
                         total_links[0] += 1
 
                 for hw in item.get("homeworkIds", []):
                     hw_id = hw.get("_id")
+                    hw_date = extract_date(hw) or date
                     for attachment in hw.get("attachmentIds", []):
                         try:
                             name = clean_text(attachment.get("name", ""))
@@ -72,11 +74,11 @@ async def process_subject_content(session, target_id, subject_id, headers, all_l
                                 full_url = f"{base_url}{key}"
                                 if '.mpd' in full_url:
                                     final_url, parent_id, child_id = extract_mpd_info(full_url, hw_id, target_id)
-                                    line = format_content_line(name, final_url, subject_name, parent_id, child_id)
+                                    line = format_content_line(name, final_url, subject_name, parent_id, child_id, hw_date)
                                     all_links.append(line)
                                     total_links[0] += 1
                                 else:
-                                    line = format_content_line(name, full_url, subject_name)
+                                    line = format_content_line(name, full_url, subject_name, date=hw_date)
                                     all_links.append(line)
                                     total_links[0] += 1
                         except Exception as e:
@@ -110,14 +112,41 @@ def clean_text(text):
     text = text.replace(":", "_").replace("/", "_").replace("|", "_").replace("\\", "_")
     return text
 
-def format_content_line(name, url, subject_name="", parent_id=None, child_id=None):
-    """Format content line with subject name as prefix instead of content type"""
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    # Unix timestamp (seconds or milliseconds)
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    # Try common date formats
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:len(fmt.replace('%','').replace('f','').replace('Z',''))], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    # Fallback: try to parse with dateutil or just return first 10 chars
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
+def format_content_line(name, url, subject_name="", parent_id=None, child_id=None, date=""):
+    """Format content line with subject name and date as prefix"""
     name = clean_text(name)
     prefix = f"[{subject_name}] " if subject_name else ""
+    date_str = f"{date} " if date else ""
     
     if parent_id and child_id:
-        return f"{prefix}{name}:{url}&parentId={parent_id}&childId={child_id}"
-    return f"{prefix}{name}:{url}"
+        return f"{prefix}{date_str}{name}:{url}&parentId={parent_id}&childId={child_id}"
+    return f"{prefix}{date_str}{name}:{url}"
 
 @app.on_message(filters.command(["pw"]))
 async def pw_login(app, message):

@@ -102,6 +102,29 @@ def decrypt(enc):
     b = plaintext.decode('utf-8')
     return b
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 @app.on_message(filters.command(["utkarsh", "utk", "utk_dl"]))  # Added more handlers
 async def handle_utk_logic(app, m):
     session_manager = SessionManager(app)
@@ -516,7 +539,7 @@ def process_topic(subject_id, topic_id, batch_id, headers, token, Key, iv):
                             url = "https://apps-s3-jw-prod.utkarshapp.com/admin_v1/file_library/videos/enc_plain_mp4/{}/plain/720x1280.mp4".format(url.split("_")[0])
                         elif not url.startswith("https://") and not url.startswith("http://"):
                             url = f"https://youtu.be/{url}"
-                        cc = f'{title}: {url}'
+                        item_date = extract_date(item); date_str = f"{item_date} " if item_date else ""; cc = f'{date_str}{title}: {url}'
                         topic_urls.append(cc)
                         
             except Exception as e:

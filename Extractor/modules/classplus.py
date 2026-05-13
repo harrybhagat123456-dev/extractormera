@@ -25,7 +25,30 @@ time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
 
 
 apiurl = "https://api.classplusapp.com"
-s = cloudscraper.create_scraper() 
+s = cloudscraper.create_scraper()
+
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return "" 
 
 @app.on_message(filters.command(["cp"]))
 async def classplus_txt(app, message):
@@ -426,7 +449,9 @@ async def extract_batch(app, message, org_name, batch_id):
                                     # Encode the latter part of the URL
                                     encoded_url = encode_partial_url(video_url)
                                     # Include contentHashId as part of the output
-                                    outputs.append(f"[{org_name}] {name}:\n{encoded_url}\ncontentHashId: {content_hash}\n")
+                                    vid_date = extract_date(video)
+                                    date_str = f"{vid_date} " if vid_date else ""
+                                    outputs.append(f"[{org_name}] {date_str}{name}:\n{encoded_url}\ncontentHashId: {content_hash}\n")
                 except Exception as e:
                     print(f"Error fetching live videos: {e}")
 
@@ -457,7 +482,9 @@ async def extract_batch(app, message, org_name, batch_id):
                         encoded_url = encode_partial_url(video_url)
                         if content_hash:
                             encoded_url += f"*UGxCP_hash={content_hash}\n"
-                        full_info = f"[{org_name}] {folder_path}{sub_name}: {encoded_url}"
+                        item_date = extract_date(item)
+                        date_str = f"{item_date} " if item_date else ""
+                        full_info = f"[{org_name}] {date_str}{folder_path}{sub_name}: {encoded_url}"
                         result.append(full_info)
 
                 elif content_type == "1":  # Folder

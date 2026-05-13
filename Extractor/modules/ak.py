@@ -70,6 +70,29 @@ async def make_request(url: str, headers=None, method="GET", data=None, timeout=
         logger.error(f"Request error: {e}")
         return None
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 class VideoProcessor:
     def __init__(self, headers: Dict[str, str], semaphore: asyncio.Semaphore):
         self.headers = headers
@@ -97,10 +120,10 @@ class VideoProcessor:
                         video_token = safe_get(token_response.json(), "data", "token")
                         if video_token:
                             stream_url = f"https://edge.api.brightcove.com/playback/v2/accounts/6415636611001/videos/{url}/master.m3u8?bcov_auth={video_token}"
-                            return (name, stream_url)
+                            vid_date = extract_date(item); return (name, stream_url, vid_date)
             elif ext == "youtube":
                 video_url = f"https://www.youtube.com/embed/{url}"
-                return (name, video_url)
+                return (name, video_url, "")
 
         except Exception as e:
             logger.error(f"Error processing video {name}: {e}")
@@ -153,7 +176,7 @@ class AKExtractor:
                             name = safe_get(item, "docTitle", default="Untitled").replace(":", " ")
                             url = safe_get(item, "docUrl")
                             if url:
-                                results.append((name, url))
+                                note_date = extract_date(item); results.append((name, url, note_date))
 
             except Exception as e:
                 logger.error(f"Error processing content type {content_type}: {e}")
@@ -408,8 +431,13 @@ class AKExtractor:
             batch_name = batch_info[batch_id]
             file_name = f"AK_{batch_name}-@CoreUG.txt"
             with open(file_name, "w", encoding='utf-8') as f:
-                for name, url in results:
-                    f.write(f"{name}: {url}\n")
+                for result in results:
+                    if len(result) == 3:
+                        name, url, date = result
+                    else:
+                        name, url, date = result[0], result[1], ""
+                    date_str = f"{date} " if date else ""
+                    f.write(f"{date_str}{name}: {url}\n")
 
             # Calculate stats
             end_time = time.time()

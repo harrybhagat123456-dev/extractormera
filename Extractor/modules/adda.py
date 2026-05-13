@@ -31,6 +31,29 @@ logger = logging.getLogger(__name__)
 THUMB_PATH = "thumb.jpg"
 TIMEOUT = 30  # Timeout for requests in seconds
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 def safe_get(obj, *keys, default=None):
     """Safely get nested dictionary values"""
     try:
@@ -232,7 +255,9 @@ async def adda_command_handler(app, m):
                                     content_name = safe_get(content, "name", default="Untitled").replace('|', '_').replace('/', '_')
                                     content_url = safe_get(content, "url")
                                     if content_url:
-                                        file.write(f"[{category.replace('_', ' ').title()}] {content_name}: {content_url}\n")
+                                        content_date = extract_date(content)
+                                        date_str = f"{content_date} " if content_date else ""
+                                        file.write(f"[{category.replace('_', ' ').title()}] {date_str}{content_name}: {content_url}\n")
                                         total_items += 1
 
                         # If no direct content, try child packages
@@ -281,7 +306,9 @@ async def adda_command_handler(app, m):
                                                 pdf_file = safe_get(item, "pdfFileName") or safe_get(item, "pdf")
                                                 if pdf_file:
                                                     pdf_link = f"https://store.adda247.com/{pdf_file}"
-                                                    file.write(f"[{category.replace('_', ' ').title()}] {item_name}: {pdf_link}\n")
+                                                    item_date = extract_date(item)
+                                                    date_str = f"{item_date} " if item_date else ""
+                                                    file.write(f"[{category.replace('_', ' ').title()}] {date_str}{item_name}: {pdf_link}\n")
                                                     total_items += 1
 
                                                 # Handle Video URL
@@ -296,7 +323,9 @@ async def adda_command_handler(app, m):
                                                             for line in video_response.split('\n'):
                                                                 if "480p30playlist.m3u8" in line:
                                                                     stream_url = line.replace('/updated', '/demo/updated')
-                                                                    file.write(f"[{category.replace('_', ' ').title()}] {item_name}: {stream_url}\n")
+                                                                    item_date = extract_date(item)
+                                                                    date_str = f"{item_date} " if item_date else ""
+                                                                    file.write(f"[{category.replace('_', ' ').title()}] {date_str}{item_name}: {stream_url}\n")
                                                                     total_items += 1
                                                                     break
                                                     except Exception as e:

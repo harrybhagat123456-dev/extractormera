@@ -32,6 +32,29 @@ def download_thumbnail(url):
     except Exception:
         return None
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 # -------------------- Downloader Function ---------------------
 async def careerdl(app, message, headers, raw_text2, token, raw_text3, prog, name):
     num_id = raw_text3.split('&')
@@ -99,7 +122,7 @@ async def careerdl(app, message, headers, raw_text2, token, raw_text3, prog, nam
                 else:
                     continue
 
-                result_text += f"{lesson_name}: {video_link}\n"
+                vid_date = extract_date(video_data); date_str = f"{vid_date} " if vid_date else ""; result_text += f"{date_str}{lesson_name}: {video_link}\n"
 
             # Notes
             notes_url = f"https://elearn.crwilladmin.com/api/v9/batch-topic/{raw_text2}?type=notes"
@@ -113,7 +136,7 @@ async def careerdl(app, message, headers, raw_text2, token, raw_text3, prog, nam
                     for note in reversed(notes_data.get('data', {}).get('notesDetails', [])):
                         doc_title = note.get('docTitle', '')
                         doc_url = note.get('docUrl', '').replace(' ', '%20')
-                        line = f"{doc_title}: {doc_url}\n"
+                        note_date = extract_date(note); date_str = f"{note_date} " if note_date else ""; line = f"{date_str}{doc_title}: {doc_url}\n"
                         if line not in result_text:
                             result_text += line
                             total_notes += 1

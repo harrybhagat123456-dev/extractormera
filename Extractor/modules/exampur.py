@@ -16,6 +16,29 @@ from Extractor.core.utils import forward_to_log
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 async def exampur_txt(app, message):
     try:
         start_time = datetime.now()
@@ -221,7 +244,7 @@ async def exampur_txt(app, message):
                         title = material.get('title', '')
                         url = material.get('video_link', '')
                         if url:
-                            all_urls.append(f"{title}:{url}")
+                            mat_date = extract_date(material); date_str = f"{mat_date} " if mat_date else ""; all_urls.append(f"{date_str}{title}:{url}")
 
                 processed += 1
 

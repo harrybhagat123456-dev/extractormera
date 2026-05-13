@@ -29,6 +29,29 @@ india_timezone = pytz.timezone('Asia/Kolkata')
 current_time = datetime.now(india_timezone)
 time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 @app.on_message(filters.command(["kd"]))
 async def kdlive(app, m):
     try:
@@ -294,7 +317,9 @@ async def extract(app, m, appname):
                                         url = video.get('jwplayer_id', '')
                                         if title and url:
                                             url = "https://" + url
-                                            all_urls.append(f"[{subject_name}] {title}: {url}")
+                                            vid_date = extract_date(video)
+                                            date_str = f"{vid_date} " if vid_date else ""
+                                            all_urls.append(f"[{subject_name}] {date_str}{title}: {url}")
                                             subject_content.append(f"🎬 {title}\n{url}")
                                             total_videos += 1
                             except Exception as e:
@@ -313,7 +338,9 @@ async def extract(app, m, appname):
                                         filename = pdf.get('file_name', '')
                                         if title and filename:
                                             url = "https://kdcampus.live/uploaded/content_data/" + filename
-                                            all_urls.append(f"[{subject_name}] {title}: {url}")
+                                            pdf_date = extract_date(pdf)
+                                            date_str = f"{pdf_date} " if pdf_date else ""
+                                            all_urls.append(f"[{subject_name}] {date_str}{title}: {url}")
                                             subject_content.append(f"📄 {title}\n{url}")
                                             total_pdfs += 1
                             except Exception as e:

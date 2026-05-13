@@ -6,6 +6,29 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 from base64 import b64decode
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 @Client.on_message(filters.command(["rgvikramjeet"]))
 async def rgvikramjeet(bot: Client, m: Message):
     await m.reply_text("Send **ID & Password** like this: `ID*Password`")
@@ -120,7 +143,7 @@ async def rgvikramjeet(bot: Client, m: Message):
                         cipher = AES.new(key, AES.MODE_CBC, iv)
                         plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
                         decrypted_link = plaintext.decode('utf-8')
-                        download_links.append(f"{title}: {decrypted_link}")
+                        vid_date = extract_date(video); date_str = f"{vid_date} " if vid_date else ""; download_links.append(f"{date_str}{title}: {decrypted_link}")
                     except Exception as e:
                         download_links.append(f"{title}: Failed to decrypt")
 

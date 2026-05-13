@@ -310,6 +310,29 @@ async def extract_content(app, message, headers, batch, progress_msg):
             "Please try again or contact support."
         )
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 def process_lesson(lesson, headers, timeout):
     """Process a single lesson (runs in thread)."""
     try:
@@ -334,7 +357,7 @@ def process_lesson(lesson, headers, timeout):
             name = video.get('name', 'Untitled Video')
             url = video.get('video_url', '')
             if url:
-                urls.append(f"{name}: {url}")
+                vid_date = extract_date(video); date_str = f"{vid_date} " if vid_date else ""; urls.append(f"{date_str}{name}: {url}")
                 topic_content.append(f"🎬 {name}\n{url}")
                 
         # Process PDFs/Notes
@@ -343,7 +366,7 @@ def process_lesson(lesson, headers, timeout):
             name = note.get('name', 'Untitled Note')
             url = note.get('url', '')
             if url:
-                urls.append(f"{name}: {url}")
+                note_date = extract_date(note); date_str = f"{note_date} " if note_date else ""; urls.append(f"{date_str}{name}: {url}")
                 topic_content.append(f"📄 {name}\n{url}")
                 
         return lesson_name, urls, topic_content

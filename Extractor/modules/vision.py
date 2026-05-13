@@ -34,6 +34,18 @@ HEADERS = {
     "Upgrade-Insecure-Requests": "1"
 }
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    try:
+        if hasattr(item, 'attrs'):
+            for attr in ['data-date', 'data-time', 'data-created', 'data-start', 'datetime']:
+                val = item.get(attr)
+                if val:
+                    return val[:10] if len(val) >= 10 else val
+    except:
+        pass
+    return ""
+
 class VisionIASExtractor:
     def __init__(self, app: Optional[Client] = None, message: Optional[Message] = None):
         self.session = requests.Session()
@@ -234,7 +246,7 @@ Send batch ID to start extraction...
                             name = link.get_text(strip=True)
                             url = link.get("href")
                             if url:
-                                self.video_urls.append(f"[{batch_name}] {name}: {url}")
+                                link_date = extract_date(link); date_str = f"{link_date} " if link_date else ""; self.video_urls.append(f"[{batch_name}] {date_str}{name}: {url}")
                     else:
                         await self.send_message(f"""
 ⚠️ <b>Section Error</b>

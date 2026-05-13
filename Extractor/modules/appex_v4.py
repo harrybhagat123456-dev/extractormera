@@ -29,6 +29,29 @@ current_time = datetime.now(india_timezone)
 time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
 
 
+def extract_date(item):
+    """Extract and format date from API response item"""
+    for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
+        val = item.get(field)
+        if val:
+            try:
+                from datetime import datetime as dt
+                if isinstance(val, (int, float)):
+                    if val > 1e12:
+                        val = val / 1000
+                    return dt.fromtimestamp(val).strftime('%d-%m-%Y')
+                elif isinstance(val, str):
+                    for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            return dt.strptime(val[:26], fmt).strftime('%d-%m-%Y')
+                        except:
+                            continue
+                    if len(val) >= 10:
+                        return val[:10]
+            except:
+                pass
+    return ""
+
 def decrypt(enc):
     enc = b64decode(enc.split(':')[0])
     key = '638udh3829162018'.encode('utf-8')
@@ -87,6 +110,9 @@ async def process_video(session, api_base, bi, si, sn, ti, tn, video, hdr1):
             print(f"Skipping video ID {vi}: No data found.")
             return None
 
+        date = extract_date(r4.get("data", {}))
+        date_str = f"{date} " if date else ""
+
         vt = r4.get("data", {}).get("Title", "")
         vl = r4.get("data", {}).get("download_link", "")
         fl = r4.get("data", {}).get("video_id", "")
@@ -94,12 +120,12 @@ async def process_video(session, api_base, bi, si, sn, ti, tn, video, hdr1):
         if fl:
             dfl = decrypt(fl)
             final_link = f"https://youtu.be/{dfl}"
-            lines.append(f"[{sn}] {vt}:{final_link}\n")
+            lines.append(f"[{sn}] {date_str}{vt}:{final_link}\n")
 
         if vl:
             dvl = decrypt(vl)
             if ".pdf" not in dvl: 
-                lines.append(f"[{sn}] {vt}:{dvl}\n")
+                lines.append(f"[{sn}] {date_str}{vt}:{dvl}\n")
                  
         else:
             encrypted_links = r4.get("data", {}).get("encrypted_links", [])
@@ -111,10 +137,10 @@ async def process_video(session, api_base, bi, si, sn, ti, tn, video, hdr1):
                     da = decrypt(a)
                     k1 = decrypt(k)
                     k2 = decode_base64(k1)
-                    lines.append(f"[{sn}] {vt}:{da}*{k2}\n")
+                    lines.append(f"[{sn}] {date_str}{vt}:{da}*{k2}\n")
                 elif a:
                     da = decrypt(a)
-                    lines.append(f"[{sn}] {vt}:{da}\n")
+                    lines.append(f"[{sn}] {date_str}{vt}:{da}\n")
         
         if "material_type" in r4.get("data", {}):
             mt = r4["data"]["material_type"]
@@ -128,16 +154,16 @@ async def process_video(session, api_base, bi, si, sn, ti, tn, video, hdr1):
                     dp1 = decrypt(p1)
                     depk1 = decrypt(pk1)
                     if depk1 == "abcdefg":
-                        lines.append(f"[{sn}] {vt}:{dp1}\n")
+                        lines.append(f"[{sn}] {date_str}{vt}:{dp1}\n")
                     else:
-                        lines.append(f"[{sn}] {vt}:{dp1}*{depk1}\n")
+                        lines.append(f"[{sn}] {date_str}{vt}:{dp1}*{depk1}\n")
                 if p2 and pk2:
                     dp2 = decrypt(p2)
                     depk2 = decrypt(pk2)
                     if depk2 == "abcdefg":
-                        lines.append(f"[{sn}] {vt}:{dp2}\n")
+                        lines.append(f"[{sn}] {date_str}{vt}:{dp2}\n")
                     else:
-                        lines.append(f"[{sn}] {vt}:{dp2}*{depk2}\n")
+                        lines.append(f"[{sn}] {date_str}{vt}:{dp2}*{depk2}\n")
 
         
         if "material_type" in r4.get("data", {}):
@@ -152,16 +178,16 @@ async def process_video(session, api_base, bi, si, sn, ti, tn, video, hdr1):
                     dp1 = decrypt(p1)
                     depk1 = decrypt(pk1)
                     if depk1 == "abcdefg":
-                        lines.append(f"[{sn}] {vt}:{dp1}\n")
+                        lines.append(f"[{sn}] {date_str}{vt}:{dp1}\n")
                     else:
-                        lines.append(f"[{sn}] {vt}:{dp1}*{depk1}\n")
+                        lines.append(f"[{sn}] {date_str}{vt}:{dp1}*{depk1}\n")
                 if p2 and pk2:
                     dp2 = decrypt(p2)
                     depk2 = decrypt(pk2)
                     if depk2 == "abcdefg":
-                        lines.append(f"[{sn}] {vt}:{dp2}\n")
+                        lines.append(f"[{sn}] {date_str}{vt}:{dp2}\n")
                     else:
-                        lines.append(f"[{sn}] {vt}:{dp2}*{depk2}\n")
+                        lines.append(f"[{sn}] {date_str}{vt}:{dp2}*{depk2}\n")
                         
         return lines
     
