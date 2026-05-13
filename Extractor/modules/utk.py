@@ -34,6 +34,28 @@ MAX_WORKERS = 5000  # Increased workers for better performance
 UPDATE_INTERVAL = 15  # Update progress message every 15 seconds
 CHECKPOINT_FILE = "batch_checkpoint.json"
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 class SessionManager:
     def __init__(self, app):
         self.app = app
@@ -619,6 +641,9 @@ async def login(app, user_id, m, all_urls, start_time, bname, batch_id, progress
         file_path = f"{bname}.txt"
         
         await safe_edit_message(progress_msg, "💾 Creating file with extracted URLs...")
+        
+        # Sort URLs by date in ascending order (oldest first)
+        all_urls = sort_lines_by_date(all_urls)
         
         async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
             await f.writelines([url + '\n' for url in all_urls])

@@ -25,6 +25,29 @@ time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
 THREADPOOL = ThreadPoolExecutor(max_workers=5000)
 
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
+
 def extract_date(item):
     """Extract and format date from API response item"""
     for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
@@ -509,7 +532,11 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                         
                         with open(f"{clean_file_name}.json", 'w') as f:
                             json.dump(json_data, f, indent=4)
-                            
+                        
+                        # Sort by date in ascending order (oldest first)
+                        for sn in all_subject_urls:
+                            all_subject_urls[sn] = sort_lines_by_date(all_subject_urls[sn])
+                        
                         with open(f"{clean_file_name}.txt", 'w', encoding='utf-8') as f:
                             for subject in subjects:
                                 subject_name = subject.get("subject", "Unknown Subject").replace("/", "-")
@@ -524,6 +551,8 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                     selected_batch_name = "Today's Class"
                     today_schedule = await get_pwwp_all_todays_schedule_content(session, selected_batch_id, headers)
                     if today_schedule:
+                        # Sort by date in ascending order (oldest first)
+                        today_schedule = sort_lines_by_date(today_schedule)
                         with open(f"{clean_file_name}.txt", "w", encoding="utf-8") as f:
                             f.writelines(today_schedule)
                     else:

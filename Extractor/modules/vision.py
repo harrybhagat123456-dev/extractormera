@@ -24,6 +24,28 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://www.visionias.in"
 TMP_DIR = "tmp_downloads"
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 # Headers
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -265,6 +287,9 @@ Send batch ID to start extraction...
             
             # Save all URLs to file
             if self.video_urls:
+                # Sort URLs by date in ascending order (oldest first)
+                self.video_urls = sort_lines_by_date(self.video_urls)
+                
                 with open("classes_links.txt", "w", encoding="utf-8") as f:
                     f.write(f"=== Vision IAS Package {batch_id} Videos ===\n\n")
                     for i, url in enumerate(self.video_urls, 1):

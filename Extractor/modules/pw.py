@@ -138,6 +138,30 @@ def extract_date(item):
                 pass
     return ""
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        # Try YYYY-MM-DD format first (e.g., 2025-09-23) - more specific
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        # Try DD-MM-YYYY format (e.g., 23-09-2025)
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 def format_content_line(name, url, subject_name="", parent_id=None, child_id=None, date=""):
     """Format content line with subject name and date as prefix"""
     name = clean_text(name)
@@ -317,6 +341,9 @@ async def pw_login(app, message):
             for sn in all_subjects_progress:
                 all_subjects_progress[sn] = True
             await update_progress()
+
+        # Sort links by date in ascending order
+        all_links = sort_lines_by_date(all_links)
 
         # Write all collected links to file
         with open(filename, 'w', encoding='utf-8') as f:

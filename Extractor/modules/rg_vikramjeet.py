@@ -6,6 +6,28 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 from base64 import b64decode
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 def extract_date(item):
     """Extract and format date from API response item"""
     for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
@@ -148,6 +170,8 @@ async def rgvikramjeet(bot: Client, m: Message):
                         download_links.append(f"{title}: Failed to decrypt")
 
         filename = f"Rgvikramjeet_{selected_course}.txt"
+        # Sort by date in ascending order (oldest first)
+        download_links = sort_lines_by_date(download_links)
         with open(filename, 'w') as f:
             for line in download_links:
                 f.write(f"{line}\n")

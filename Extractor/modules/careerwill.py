@@ -18,6 +18,29 @@ ACCOUNT_ID = "6206459123001"
 bc_url = f"https://edge.api.brightcove.com/playback/v1/accounts/{ACCOUNT_ID}/videos/"
 
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
+
 # Download thumbnail
 def download_thumbnail(url):
     try:
@@ -150,8 +173,10 @@ async def careerdl(app, message, headers, raw_text2, token, raw_text3, prog, nam
             await message.reply(error_msg)
 
     file_name = f"{name.replace('/', '')}.txt"
+    # Sort by date in ascending order (oldest first)
+    result_lines = sort_lines_by_date(result_text.splitlines())
     with open(file_name, 'w', encoding='utf-8') as f:
-        f.write(result_text)
+        f.write('\n'.join(result_lines))
 
     import datetime
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")

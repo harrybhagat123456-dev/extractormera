@@ -26,6 +26,28 @@ time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
 
 THREADPOOL = ThreadPoolExecutor(max_workers=5000)
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 async def download_thumbnail(session: aiohttp.ClientSession, url: str) -> str | None:
     try:
         # Create a temporary filename
@@ -540,6 +562,9 @@ async def process_cpwp(bot: Client, m: Message, user_id: int):
                                     # Create individual file for this batch
                                     batch_filename = f"{clean_batch_name}_{batch_index}.txt"
                                     original_filename = f"{clean_batch_name}_{batch_index}_original.txt"
+                                    
+                                    # Sort by date in ascending order (oldest first)
+                                    course_content = sort_lines_by_date(course_content)
                                     
                                     # Save original content for logs
                                     with open(original_filename, 'w', encoding='utf-8') as f:

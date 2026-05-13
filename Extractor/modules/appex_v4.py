@@ -28,6 +28,28 @@ india_timezone = pytz.timezone('Asia/Kolkata')
 current_time = datetime.now(india_timezone)
 time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 
 def extract_date(item):
     """Extract and format date from API response item"""
@@ -458,30 +480,37 @@ async def appex_v5_txt(app, message, api, name):
                     filename1 = filename
                 
                 async with aiohttp.ClientSession() as session:
-                    with open(filename1, 'w') as f:
-                        try:
-                            r1 = await fetch(session, f"{api_base}/get/allsubjectfrmlivecourseclass?courseid={raw_text2}&start=-1", hdr1)
-                
-                            for subject in r1.get("data", []):
-                                si = subject.get("subjectid")
-                                sn = subject.get("subject_name")
-
-                                r2 = await fetch(session, f"{api_base}/get/alltopicfrmlivecourseclass?courseid={raw_text2}&subjectid={si}&start=-1", hdr1)
-                                topics = sorted(r2.get("data", []), key=lambda x: x.get("topicid"))
-
-                                tasks = [handle_course(session, api_base, raw_text2, si, sn, t, hdr1) for t in topics]
-                                all_data = await asyncio.gather(*tasks)
-                    
-                                for data in all_data:
-                                    if data:
-                                        f.writelines(data)
+                    all_collected_lines = []
+                    try:
+                        r1 = await fetch(session, f"{api_base}/get/allsubjectfrmlivecourseclass?courseid={raw_text2}&start=-1", hdr1)
             
-                        except Exception as e:
-                            print(f"An error occurred while processing batch {raw_text2}: {str(e)}")
-                            await message.reply_text(f"⚠️ Error processing batch {raw_text2}. Trying alternative method...")
-                            sanitized_course_name = course_name.replace(':', '_').replace('/', '_')
-                            await v2_new(app, message, token, userid, hdr1, app_name, raw_text2, api_base, sanitized_course_name, start_time, start_date, end_date, price, input2, m1, m2)
-                            continue
+                        for subject in r1.get("data", []):
+                            si = subject.get("subjectid")
+                            sn = subject.get("subject_name")
+
+                            r2 = await fetch(session, f"{api_base}/get/alltopicfrmlivecourseclass?courseid={raw_text2}&subjectid={si}&start=-1", hdr1)
+                            topics = sorted(r2.get("data", []), key=lambda x: x.get("topicid"))
+
+                            tasks = [handle_course(session, api_base, raw_text2, si, sn, t, hdr1) for t in topics]
+                            all_data = await asyncio.gather(*tasks)
+                
+                            for data in all_data:
+                                if data:
+                                    all_collected_lines.extend(data)
+        
+                    except Exception as e:
+                        print(f"An error occurred while processing batch {raw_text2}: {str(e)}")
+                        await message.reply_text(f"⚠️ Error processing batch {raw_text2}. Trying alternative method...")
+                        sanitized_course_name = course_name.replace(':', '_').replace('/', '_')
+                        await v2_new(app, message, token, userid, hdr1, app_name, raw_text2, api_base, sanitized_course_name, start_time, start_date, end_date, price, input2, m1, m2)
+                        continue
+                    
+                    # Sort lines by date in ascending order (oldest first)
+                    all_collected_lines = sort_lines_by_date(all_collected_lines)
+                    
+                    # Write sorted lines to file
+                    with open(filename1, 'w') as f:
+                        f.writelines(all_collected_lines)
                         
                     end_time = time.time()
                     elapsed_time = end_time - start_time

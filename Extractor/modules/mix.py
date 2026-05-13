@@ -18,6 +18,28 @@ import config
 import logging
 from bs4 import BeautifulSoup
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -236,6 +258,9 @@ async def v2_new(app, message, token, userid, hdr1, app_name, raw_text2, api_bas
             pdf_count = sum(1 for url in all_outputs if '.pdf' in url.lower())
             encrypted_count = sum(1 for url in all_outputs if '*' in url)
 
+            # Sort outputs by date in ascending order (oldest first)
+            all_outputs = sort_lines_by_date(all_outputs)
+            
             # Save content to file
             file_name = f"{app_name}_{sanitized_course_name}_{int(datetime.now().timestamp())}.txt"
             with open(file_name, 'w', encoding='utf-8') as f:

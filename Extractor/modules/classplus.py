@@ -19,6 +19,28 @@ from Extractor.core.utils import forward_to_log
 import base64
 from urllib.parse import urlparse, parse_qs
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 india_timezone = pytz.timezone('Asia/Kolkata')
 current_time = datetime.now(india_timezone)
 time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
@@ -515,6 +537,10 @@ async def extract_batch(app, message, org_name, batch_id):
         )
 
         extracted_data.extend(live_videos)
+        
+        # Sort extracted data by date in ascending order (oldest first)
+        extracted_data = sort_lines_by_date(extracted_data)
+        
         file_path = await write_to_file(extracted_data)
 
         # Count different types of content

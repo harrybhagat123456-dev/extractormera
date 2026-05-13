@@ -31,6 +31,28 @@ logger = logging.getLogger(__name__)
 THUMB_PATH = "thumb.jpg"
 TIMEOUT = 30  # Timeout for requests in seconds
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 def extract_date(item):
     """Extract and format date from API response item"""
     for field in ['createdAt', 'created_at', 'date', 'startTime', 'updatedAt', 'updated_at', 'createdDate', 'publishedOn']:
@@ -233,6 +255,7 @@ async def adda_command_handler(app, m):
                     start = time.time()
                     file_name = f"ADDA_{package_id}_{package_title}.txt"
                     total_items = 0
+                    all_collected_lines = []
 
                     with open(file_name, "w", encoding='utf-8') as file:
                         # First try the direct content API
@@ -258,6 +281,7 @@ async def adda_command_handler(app, m):
                                         content_date = extract_date(content)
                                         date_str = f"{content_date} " if content_date else ""
                                         file.write(f"[{category.replace('_', ' ').title()}] {date_str}{content_name}: {content_url}\n")
+                                        all_collected_lines.append(f"[{category.replace('_', ' ').title()}] {date_str}{content_name}: {content_url}\n")
                                         total_items += 1
 
                         # If no direct content, try child packages
@@ -309,6 +333,7 @@ async def adda_command_handler(app, m):
                                                     item_date = extract_date(item)
                                                     date_str = f"{item_date} " if item_date else ""
                                                     file.write(f"[{category.replace('_', ' ').title()}] {date_str}{item_name}: {pdf_link}\n")
+                                                    all_collected_lines.append(f"[{category.replace('_', ' ').title()}] {date_str}{item_name}: {pdf_link}\n")
                                                     total_items += 1
 
                                                 # Handle Video URL
@@ -326,6 +351,7 @@ async def adda_command_handler(app, m):
                                                                     item_date = extract_date(item)
                                                                     date_str = f"{item_date} " if item_date else ""
                                                                     file.write(f"[{category.replace('_', ' ').title()}] {date_str}{item_name}: {stream_url}\n")
+                                                                    all_collected_lines.append(f"[{category.replace('_', ' ').title()}] {date_str}{item_name}: {stream_url}\n")
                                                                     total_items += 1
                                                                     break
                                                     except Exception as e:
@@ -341,6 +367,12 @@ async def adda_command_handler(app, m):
                                 parse_mode=ParseMode.HTML
                             )
                             continue
+
+                    # Sort collected lines by date in ascending order (oldest first)
+                    if all_collected_lines:
+                        all_collected_lines = sort_lines_by_date(all_collected_lines)
+                        with open(file_name, "w", encoding='utf-8') as file:
+                            file.writelines(all_collected_lines)
 
                     if os.path.getsize(file_name) > 0:
                         end = time.time()

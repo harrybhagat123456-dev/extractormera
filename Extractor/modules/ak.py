@@ -25,6 +25,28 @@ TIMEOUT = 30
 MAX_CONCURRENT_REQUESTS = 10  # Maximum concurrent requests
 CHUNK_SIZE = 5  # Number of items to process in parallel
 
+def sort_lines_by_date(lines):
+    """Sort output lines by embedded date in ascending order (oldest first).
+    Handles both YYYY-MM-DD and DD-MM-YYYY date formats."""
+    import re as _re
+    from datetime import datetime as _dt
+    def _extract_sort_date(line):
+        match = _re.search(r'(\d{4})-(\d{2})-(\d{2})', line)
+        if match:
+            try:
+                return _dt.strptime(match.group(0), '%Y-%m-%d')
+            except:
+                pass
+        match = _re.search(r'(\d{2})-(\d{2})-(\d{4})', line)
+        if match:
+            try:
+                day, month, year = match.group(1), match.group(2), match.group(3)
+                return _dt.strptime(f"{year}-{month}-{day}", '%Y-%m-%d')
+            except:
+                pass
+        return _dt.min
+    return sorted(lines, key=_extract_sort_date)
+
 def safe_get(obj, *keys, default=None):
     """Safely get nested dictionary values"""
     try:
@@ -430,14 +452,19 @@ class AKExtractor:
             # Write results to file using batch name
             batch_name = batch_info[batch_id]
             file_name = f"AK_{batch_name}-@CoreUG.txt"
+            # Build lines from results
+            output_lines = []
+            for result in results:
+                if len(result) == 3:
+                    name, url, date = result
+                else:
+                    name, url, date = result[0], result[1], ""
+                date_str = f"{date} " if date else ""
+                output_lines.append(f"{date_str}{name}: {url}\n")
+            # Sort by date in ascending order (oldest first)
+            output_lines = sort_lines_by_date(output_lines)
             with open(file_name, "w", encoding='utf-8') as f:
-                for result in results:
-                    if len(result) == 3:
-                        name, url, date = result
-                    else:
-                        name, url, date = result[0], result[1], ""
-                    date_str = f"{date} " if date else ""
-                    f.write(f"{date_str}{name}: {url}\n")
+                f.writelines(output_lines)
 
             # Calculate stats
             end_time = time.time()
