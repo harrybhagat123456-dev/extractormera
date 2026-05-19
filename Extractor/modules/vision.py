@@ -540,15 +540,17 @@ Example: <code>deweshkumar393@gmail.com*dev@vision</code>
             if not await self.login(user_id.strip(), password.strip()):
                 return
             
-            # Get batch ID
+            # Get batch ID(s)
             if self.app and self.message:
+                await self.send_message("💡 <b>You can send multiple batch IDs separated by commas</b>\n\nExample: <code>id1,id2,id3</code>")
                 response = await self.app.listen(self.message.chat.id, timeout=300)
-                batch_id = response.text.strip()
+                batch_ids = [bid.strip() for bid in response.text.strip().split(",") if bid.strip()]
             else:
-                batch_id = input("Enter batch ID: ")
+                batch_ids = [bid.strip() for bid in input("Enter batch ID(s) (comma-separated): ").split(",") if bid.strip()]
             
-            # Extract content
-            await self.extract_batch(batch_id, f"Batch_{batch_id}")
+            # Extract content for each batch
+            for batch_id in batch_ids:
+                await self.extract_batch(batch_id, f"Batch_{batch_id}")
             
         except Exception as e:
             await self.send_message(f"❌ Error: {str(e)}")

@@ -437,35 +437,38 @@ async def fetch_batches(app, message, org_name):
         selected_index = await app.ask(
             message.chat.id, 
             f"{text}\n"
-            "Send the index number of the batch to download.", 
+            "Send the index number(s) of the batch(es) to download.\n\n💡 Separate multiple indices with commas for multiple TXT files\n\nExample: `1,2,3`", 
             timeout=180
         )
         
-        if selected_index.text.isdigit():
-            selected_idx = int(selected_index.text.strip())
-            
-            if 1 <= selected_idx <= len(course_list):
-                selected_course_id = course_list[selected_idx - 1][1]
-                selected_course_name = course_list[selected_idx - 1][2]
-                
-                await app.send_message(
-                    message.chat.id,
-                    "🔄 <b>Processing Course</b>\n"
-                    f"└─ Current: <code>{selected_course_name}</code>"
-                )
-                await extract_batch(app, message, org_name, selected_course_id)
-            else:
-                await app.send_message(
-                    message.chat.id,
-                    "❌ <b>Invalid Input!</b>\n\n"
-                    "Please send a valid index number from the list."
-                )
-        else:
+        # Parse comma-separated indices
+        selected_indices = []
+        for part in selected_index.text.strip().split(","):
+            part = part.strip()
+            if part.isdigit():
+                idx = int(part)
+                if 1 <= idx <= len(course_list):
+                    selected_indices.append(idx)
+        
+        if not selected_indices:
             await app.send_message(
                 message.chat.id,
                 "❌ <b>Invalid Input!</b>\n\n"
-                "Please send a valid index number."
+                "Please send valid index number(s) from the list."
             )
+            return
+        
+        # Process each selected batch
+        for selected_idx in selected_indices:
+            selected_course_id = course_list[selected_idx - 1][1]
+            selected_course_name = course_list[selected_idx - 1][2]
+            
+            await app.send_message(
+                message.chat.id,
+                "🔄 <b>Processing Course</b>\n"
+                f"└─ Current: <code>{selected_course_name}</code>"
+            )
+            await extract_batch(app, message, org_name, selected_course_id)
               
     else:
         await app.send_message(

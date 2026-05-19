@@ -273,11 +273,11 @@ async def handle_iq_logic(app, m):
             )
 
             # Ask for batch selection
-            Batch_ids_str = '&'.join(Batch_ids)
+            Batch_ids_str = ','.join(Batch_ids)
             editable1 = await m.reply_text(
                 "<b>📥 Send the Batch ID to download</b>\n\n"
                 f"<b>💡 For ALL batches:</b> <code>{Batch_ids_str}</code>\n\n"
-                "<i>Supports multiple IDs separated by '&'</i>"
+                "<i>Supports multiple IDs separated by commas</i>"
             )
 
             input4 = await app.listen(chat_id=m.chat.id)
@@ -285,10 +285,7 @@ async def handle_iq_logic(app, m):
             await editable.delete()
             await editable1.delete()
 
-            if "&" in input4.text:
-                batch_ids = input4.text.split('&')
-            else:
-                batch_ids = [input4.text]
+            batch_ids = [bid.strip() for bid in input4.text.split(',') if bid.strip()]
 
             for batch_id in batch_ids:
                 start_time = datetime.datetime.now()

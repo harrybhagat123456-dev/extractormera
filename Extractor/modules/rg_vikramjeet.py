@@ -161,81 +161,85 @@ async def rgvikramjeet(bot: Client, m: Message):
         await m.reply_text(message_text)
 
         # Ask for course ID
-        await m.reply_text("Send the **Course ID** to continue:")
+        await m.reply_text("Send the **Course ID(s)** to continue:\n\n💡 Separate multiple IDs with commas for multiple TXT files\n\nExample: `id1,id2,id3`")
         input2 = await bot.listen(m.chat.id)
-        selected_course = input2.text.strip()
+        selected_courses = [cid.strip() for cid in input2.text.strip().split(",") if cid.strip()]
 
-        # Get subjects
-        subjects_url = f"https://appapi.videocrypt.in/data_model/courses/subjects?courseId={selected_course}"
-        res_subjects = requests.get(subjects_url, headers=auth_headers)
-        subjects = res_subjects.json().get("data", [])
+        for selected_course in selected_courses:
+            try:
+                # Get subjects
+                subjects_url = f"https://appapi.videocrypt.in/data_model/courses/subjects?courseId={selected_course}"
+                res_subjects = requests.get(subjects_url, headers=auth_headers)
+                subjects = res_subjects.json().get("data", [])
 
-        subj_text = "**📘 Subjects:**\n\n"
-        for subj in subjects:
-            subj_id = subj.get("id")
-            subj_name = subj.get("subject_name")
-            subj_text += f"`{subj_id}` - **{subj_name}**\n"
-        await m.reply_text(subj_text)
+                subj_text = "**📘 Subjects:**\n\n"
+                for subj in subjects:
+                    subj_id = subj.get("id")
+                    subj_name = subj.get("subject_name")
+                    subj_text += f"`{subj_id}` - **{subj_name}**\n"
+                await m.reply_text(subj_text)
 
-        # Ask for subject ID
-        await m.reply_text("Send the **Subject ID**:")
-        input3 = await bot.listen(m.chat.id)
-        selected_subject = input3.text.strip()
+                # Ask for subject ID
+                await m.reply_text("Send the **Subject ID**:")
+                input3 = await bot.listen(m.chat.id)
+                selected_subject = input3.text.strip()
 
-        # Get selected subject name for prefix
-        selected_subject_name = next((subj.get("subject_name", "Unknown") for subj in subjects if subj.get("id") == selected_subject), "Unknown Subject")
+                # Get selected subject name for prefix
+                selected_subject_name = next((subj.get("subject_name", "Unknown") for subj in subjects if subj.get("id") == selected_subject), "Unknown Subject")
 
-        # Get topics
-        topics_url = f"https://appapi.videocrypt.in/data_model/courses/subjects/topics?subjectId={selected_subject}&courseId={selected_course}"
-        res_topics = requests.get(topics_url, headers=auth_headers)
-        topics = res_topics.json().get("data", [])
+                # Get topics
+                topics_url = f"https://appapi.videocrypt.in/data_model/courses/subjects/topics?subjectId={selected_subject}&courseId={selected_course}"
+                res_topics = requests.get(topics_url, headers=auth_headers)
+                topics = res_topics.json().get("data", [])
 
-        topic_text = "**📝 Topics:**\n\n"
-        for topic in topics:
-            topic_id = topic.get("id")
-            topic_name = topic.get("topic_name")
-            topic_text += f"`{topic_id}` - **{topic_name}**\n"
-        await m.reply_text(topic_text)
+                topic_text = "**📝 Topics:**\n\n"
+                for topic in topics:
+                    topic_id = topic.get("id")
+                    topic_name = topic.get("topic_name")
+                    topic_text += f"`{topic_id}` - **{topic_name}**\n"
+                await m.reply_text(topic_text)
 
-        # Ask for topic ID(s)
-        await m.reply_text("Send one or more **Topic IDs** (separated by &):")
-        input4 = await bot.listen(m.chat.id)
-        topic_ids = input4.text.strip().split("&")
+                # Ask for topic ID(s)
+                await m.reply_text("Send one or more **Topic IDs** (separated by &):")
+                input4 = await bot.listen(m.chat.id)
+                topic_ids = input4.text.strip().split("&")
 
-        # Ask for resolution (if needed)
-        await m.reply_text("Now send the **Resolution** (or type 'any'):")
-        input5 = await bot.listen(m.chat.id)
-        resolution = input5.text.strip()
+                # Ask for resolution (if needed)
+                await m.reply_text("Now send the **Resolution** (or type 'any'):")
+                input5 = await bot.listen(m.chat.id)
+                resolution = input5.text.strip()
 
-        download_links = []
-        for topic_id in topic_ids:
-            video_url = f"https://appapi.videocrypt.in/data_model/courses/videos?topicId={topic_id}&courseId={selected_course}"
-            res_videos = requests.get(video_url, headers=auth_headers)
-            videos = res_videos.json().get("data", [])
-            for video in videos:
-                title = video.get("Title")
-                enc_link = video.get("download_link") or video.get("pdf_link")
-                if enc_link:
-                    try:
-                        key = "638udh3829162018".encode("utf8")
-                        iv = "fedcba9876543210".encode("utf8")
-                        ciphertext = bytearray.fromhex(b64decode(enc_link.encode()).hex())
-                        cipher = AES.new(key, AES.MODE_CBC, iv)
-                        plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
-                        decrypted_link = plaintext.decode('utf-8')
-                        vid_date = extract_date(video); date_str = f"{vid_date} " if vid_date else ""; download_links.append(f"[{selected_subject_name}] {date_str}{title}: {decrypted_link}")
-                    except Exception as e:
-                        download_links.append(f"{title}: Failed to decrypt")
+                download_links = []
+                for topic_id in topic_ids:
+                    video_url = f"https://appapi.videocrypt.in/data_model/courses/videos?topicId={topic_id}&courseId={selected_course}"
+                    res_videos = requests.get(video_url, headers=auth_headers)
+                    videos = res_videos.json().get("data", [])
+                    for video in videos:
+                        title = video.get("Title")
+                        enc_link = video.get("download_link") or video.get("pdf_link")
+                        if enc_link:
+                            try:
+                                key = "638udh3829162018".encode("utf8")
+                                iv = "fedcba9876543210".encode("utf8")
+                                ciphertext = bytearray.fromhex(b64decode(enc_link.encode()).hex())
+                                cipher = AES.new(key, AES.MODE_CBC, iv)
+                                plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
+                                decrypted_link = plaintext.decode('utf-8')
+                                vid_date = extract_date(video); date_str = f"{vid_date} " if vid_date else ""; download_links.append(f"[{selected_subject_name}] {date_str}{title}: {decrypted_link}")
+                            except Exception as e:
+                                download_links.append(f"{title}: Failed to decrypt")
 
-        filename = f"Rgvikramjeet_{selected_course}.txt"
-        # Sort by date in ascending order (oldest first)
-        download_links = sort_and_group_by_subject(download_links)
-        with open(filename, 'w') as f:
-            for line in download_links:
-                f.write(f"{line}\n")
+                filename = f"Rgvikramjeet_{selected_course}.txt"
+                # Sort by date in ascending order (oldest first)
+                download_links = sort_and_group_by_subject(download_links)
+                with open(filename, 'w') as f:
+                    for line in download_links:
+                        f.write(f"{line}\n")
 
-        await m.reply_document(filename)
-        await m.reply_text("✅ Done")
+                await m.reply_document(filename)
+                await m.reply_text("✅ Done")
+            except Exception as e:
+                await m.reply_text(f"❌ Error processing course {selected_course}: {e}")
 
     except Exception as e:
         await m.reply_text(f"❌ Error occurred: {e}")

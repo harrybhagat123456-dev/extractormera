@@ -473,10 +473,10 @@ class AKExtractor:
                 try:
                     batch_message = await client.ask(
                         message.chat.id,
-                        "⌛ Waiting for batch ID...",
+                        "⌛ Waiting for batch ID(s)...\n\n💡 Separate multiple IDs with commas\n\nExample: <code>id1,id2,id3</code>",
                         timeout=120
                     )
-                    batch_id = batch_message.text.strip()
+                    batch_ids = [bid.strip() for bid in batch_message.text.strip().split(",") if bid.strip()]
                 except asyncio.TimeoutError:
                     await status_msg.edit_text(
                         "❌ <b>Timeout Error</b>\n\n"
@@ -485,93 +485,95 @@ class AKExtractor:
                     )
                     return
 
-                if batch_id not in batch_info:
+                batch_ids = [bid for bid in batch_ids if bid in batch_info]
+                if not batch_ids:
                     await status_msg.edit_text(
-                        "❌ <b>Invalid Batch ID</b>\n\n"
-                        "Please try again with a valid batch ID from the list.",
+                        "❌ <b>Invalid Batch ID(s)</b>\n\n"
+                        "Please try again with valid batch ID(s) from the list.",
                         parse_mode=ParseMode.HTML
                     )
                     return
 
-            # Process batch with concurrent requests
-            start_time = time.time()
-            results = await self.process_batch(headers, batch_id, status_msg)
-            
-            if not results:
-                await status_msg.edit_text(
-                    "❌ <b>No Content Found</b>\n\n"
-                    "This batch might be empty or inaccessible.",
+            # Process each batch ID separately
+            for batch_id in batch_ids:
+                start_time = time.time()
+                results = await self.process_batch(headers, batch_id, status_msg)
+                
+                if not results:
+                    await status_msg.edit_text(
+                        "❌ <b>No Content Found</b>\n\n"
+                        f"Batch {batch_id} might be empty or inaccessible.",
+                        parse_mode=ParseMode.HTML
+                    )
+                    continue
+
+                # Write results to file using batch name
+                batch_name = batch_info[batch_id]
+                file_name = f"AK_{batch_name}-@CoreUG.txt"
+                # Build lines from results
+                output_lines = []
+                for result in results:
+                    if len(result) >= 4:
+                        name, url, date, subj = result
+                    elif len(result) == 3:
+                        name, url, date = result
+                        subj = ""
+                    else:
+                        name, url, date, subj = result[0], result[1], "", ""
+                    date_str = f"{date} " if date else ""
+                    prefix = f"[{subj}] " if subj else ""
+                    output_lines.append(f"{prefix}{date_str}{name}: {url}\n")
+                # Sort by date in ascending order (oldest first)
+                output_lines = sort_and_group_by_subject(output_lines)
+                with open(file_name, "w", encoding='utf-8') as f:
+                    f.writelines(output_lines)
+
+                # Calculate stats
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                mention = f'<a href="tg://user?id={message.from_user.id}">{message.from_user.first_name}</a>'
+
+                # Format caption with batch name
+                caption = (
+                    "🎓 <b>COURSE EXTRACTED</b> 🎓\n\n"
+                    f"📱 <b>APP:</b> ApniKaksha\n"
+                    f"📚 <b>BATCH:</b> {batch_info[batch_id]}\n"
+                    f"⏱ <b>TIME TAKEN:</b> {elapsed_time:.1f}s\n"
+                    f"📅 <b>DATE:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} IST\n\n"
+                    f"📊 <b>CONTENT STATS</b>\n"
+                    f"└─ 📁 Total Items: {len(results)}\n\n"
+                    f"🚀 <b>Extracted by:</b> {mention}\n\n"
+                    f"<code>╾───• {BOT_TEXT} •───╼</code>"
+                )
+
+                # Send file
+                await client.send_document(
+                    message.chat.id,
+                    document=file_name,
+                    caption=caption,
+                    thumb=await download_thumbnail() if await download_thumbnail() else None,
                     parse_mode=ParseMode.HTML
                 )
-                return
 
-            # Write results to file using batch name
-            batch_name = batch_info[batch_id]
-            file_name = f"AK_{batch_name}-@CoreUG.txt"
-            # Build lines from results
-            output_lines = []
-            for result in results:
-                if len(result) >= 4:
-                    name, url, date, subj = result
-                elif len(result) == 3:
-                    name, url, date = result
-                    subj = ""
-                else:
-                    name, url, date, subj = result[0], result[1], "", ""
-                date_str = f"{date} " if date else ""
-                prefix = f"[{subj}] " if subj else ""
-                output_lines.append(f"{prefix}{date_str}{name}: {url}\n")
-            # Sort by date in ascending order (oldest first)
-            output_lines = sort_and_group_by_subject(output_lines)
-            with open(file_name, "w", encoding='utf-8') as f:
-                f.writelines(output_lines)
+                await client.send_document(
+                    PREMIUM_LOGS,
+                    document=file_name,
+                    caption=caption,
+                    thumb=await download_thumbnail() if await download_thumbnail() else None,
+                    parse_mode=ParseMode.HTML
+                )
 
-            # Calculate stats
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            mention = f'<a href="tg://user?id={message.from_user.id}">{message.from_user.first_name}</a>'
+                await status_msg.edit_text(
+                    "✅ <b>Extraction Completed!</b>\n\n"
+                    f"📊 Total Items: {len(results)}",
+                    parse_mode=ParseMode.HTML
+                )
 
-            # Format caption with batch name
-            caption = (
-                "🎓 <b>COURSE EXTRACTED</b> 🎓\n\n"
-                f"📱 <b>APP:</b> ApniKaksha\n"
-                f"📚 <b>BATCH:</b> {batch_info[batch_id]}\n"
-                f"⏱ <b>TIME TAKEN:</b> {elapsed_time:.1f}s\n"
-                f"📅 <b>DATE:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} IST\n\n"
-                f"📊 <b>CONTENT STATS</b>\n"
-                f"└─ 📁 Total Items: {len(results)}\n\n"
-                f"🚀 <b>Extracted by:</b> {mention}\n\n"
-                f"<code>╾───• {BOT_TEXT} •───╼</code>"
-            )
-
-            # Send file
-            await client.send_document(
-                message.chat.id,
-                document=file_name,
-                caption=caption,
-                thumb=await download_thumbnail() if await download_thumbnail() else None,
-                parse_mode=ParseMode.HTML
-            )
-
-            await client.send_document(
-                PREMIUM_LOGS,
-                document=file_name,
-                caption=caption,
-                thumb=await download_thumbnail() if await download_thumbnail() else None,
-                parse_mode=ParseMode.HTML
-            )
-
-            await status_msg.edit_text(
-                "✅ <b>Extraction Completed!</b>\n\n"
-                f"📊 Total Items: {len(results)}",
-                parse_mode=ParseMode.HTML
-            )
-
-            # Cleanup
-            try:
-                os.remove(file_name)
-            except Exception as e:
-                logger.error(f"Error removing file: {e}")
+                # Cleanup
+                try:
+                    os.remove(file_name)
+                except Exception as e:
+                    logger.error(f"Error removing file: {e}")
 
         except Exception as e:
             logger.error(f"Error in start_command: {e}")

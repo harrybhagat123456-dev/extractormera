@@ -299,8 +299,8 @@ async def handle_utk_logic(app, m):
             if len(f'{cool}{aa}') > 4096:
                 cool = ""
             cool += aa
-            Batch_ids += str(id) + '&'
-        Batch_ids = Batch_ids.rstrip('&')
+            Batch_ids += str(id) + ','
+        Batch_ids = Batch_ids.rstrip(',')
         
         login_msg = f'<b>✅ {appname} Login Successful</b>\n'    
         login_msg += f'\n<b>🆔 Credentials:</b> <code>{raw_text}</code>\n\n'
@@ -316,7 +316,7 @@ async def handle_utk_logic(app, m):
         editable1 = await m.reply_text(
             f"<b>📥 Send the Batch ID to download</b>\n\n"
             f"<b>💡 For ALL batches:</b> <code>{Batch_ids}</code>\n\n"
-            f"<i>Supports multiple IDs separated by '&'</i>"
+            f"<i>Supports multiple IDs separated by commas</i>"
         )
         
         user_id = int(m.chat.id)
@@ -326,10 +326,7 @@ async def handle_utk_logic(app, m):
         await editable1.delete()
         
         # Process batch ID selection
-        if "&" in input2.text:
-            batch_ids = input2.text.split('&')
-        else:
-            batch_ids = [input2.text]
+        batch_ids = [bid.strip() for bid in input2.text.split(',') if bid.strip()]
 
         # Process each selected batch
         for batch_id in batch_ids:

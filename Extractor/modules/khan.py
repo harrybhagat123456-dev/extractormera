@@ -195,11 +195,11 @@ async def khan_login(app: Client, message: Message):
             input2 = await app.ask(
                 message.chat.id,
                 f"<b>📥 Send the Batch ID to download</b>\n\n"
-                f"<b>💡 For ALL batches:</b> <code>{'&'.join(batch_ids)}</code>\n\n"
-                f"<i>Supports multiple IDs separated by '&'</i>"
+                f"<b>💡 For ALL batches:</b> <code>{','.join(batch_ids)}</code>\n\n"
+                f"<i>Supports multiple IDs separated by commas</i>"
             )
             
-            selected_ids = input2.text.strip().split('&')
+            selected_ids = [sid.strip() for sid in input2.text.strip().split(',') if sid.strip()]
             await input2.delete()
             await editable.delete()
             

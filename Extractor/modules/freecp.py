@@ -489,13 +489,13 @@ async def process_cpwp(bot: Client, m: Message, user_id: int):
                                 all_indices.append(str(cnt))
                             
                             if chunk_num == len(chunks):  # Last chunk
-                                copy_paste_format = "&".join(all_indices)
+                                copy_paste_format = ",".join(all_indices)
                                 text += f"\n**For Multiple Batches Copy This** 👇\n`{copy_paste_format}`"
                             
                             # Send each chunk as a separate message
                             try:
                                 if chunk_num == 1:  # First chunk
-                                    await editable.edit(f"**Send index number of the Category Name\n\n{text}\n\nIf Your Batch Not Listed Then Enter Your Batch Name\n\nFor multiple batches, enter indices separated by & (e.g. 1&2&3)**")
+                                    await editable.edit(f"**Send index number of the Category Name\n\n{text}\n\nIf Your Batch Not Listed Then Enter Your Batch Name\n\nFor multiple batches, enter indices separated by commas (e.g. 1,2,3)**")
                                 else:
                                     await m.reply_text(text)
                                 
@@ -548,7 +548,7 @@ async def process_cpwp(bot: Client, m: Message, user_id: int):
                     raise Exception("Didn't Find Any Course")
 
             # Handle multiple batch indices
-            batch_indices = raw_text2.split('&')
+            batch_indices = raw_text2.split(',')
             total_batches = len(batch_indices)
             processed_batches = 0
             last_wait_msg = None

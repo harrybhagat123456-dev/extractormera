@@ -341,35 +341,40 @@ async def career_will(app: Client, message: Message):
             msg += f"<code>{b['id']}</code> - <b>{b['batchName']}</b>\n"
 
         await message.reply_text(msg)
-        input2 = await app.ask(message.chat.id, "<b>Send the Batch ID to download:</b>")
-        raw_text2 = input2.text.strip()
+        input2 = await app.ask(message.chat.id, "<b>📥 Send the Batch ID(s) to download</b>\n\n💡 Separate multiple IDs with commas for multiple TXT files\n\nExample: <code>id1,id2,id3</code>")
+        raw_text2_list = [bid.strip() for bid in input2.text.strip().split(",") if bid.strip()]
 
-        # Fetch Topics
-        topic_url = f"https://elearn.crwilladmin.com/api/v9/batch-topic/{raw_text2}?type=class"
-        topic_data = requests.get(topic_url, headers=headers).json()["data"]
-        topics = topic_data["batch_topic"]
-        batch_name = topic_data["batch_detail"]["name"]
-        id_list = ""
+        # Process each batch ID separately
+        for raw_text2 in raw_text2_list:
+            try:
+                # Fetch Topics
+                topic_url = f"https://elearn.crwilladmin.com/api/v9/batch-topic/{raw_text2}?type=class"
+                topic_data = requests.get(topic_url, headers=headers).json()["data"]
+                topics = topic_data["batch_topic"]
+                batch_name = topic_data["batch_detail"]["name"]
+                id_list = ""
 
-        topic_list = "📑 <b>Available Topics</b>\n\n"
-        for topic in topics:
-            topic_list += f"<code>{topic['id']}</code> - <b>{topic['topicName']}</b>\n"
-            id_list += f"{topic['id']}&"
+                topic_list = "📑 <b>Available Topics</b>\n\n"
+                for topic in topics:
+                    topic_list += f"<code>{topic['id']}</code> - <b>{topic['topicName']}</b>\n"
+                    id_list += f"{topic['id']}&"
 
-        await message.reply_text(topic_list)
-        input3 = await app.ask(message.chat.id, 
-            "📝 <b>Send topic IDs to download</b>\n\n"
-            f"Format: <code>1&2&3</code>\n"
-            f"All Topics: <code>{id_list}</code>"
-        )
-        raw_text3 = input3.text.strip()
+                await message.reply_text(topic_list)
+                input3 = await app.ask(message.chat.id, 
+                    "📝 <b>Send topic IDs to download</b>\n\n"
+                    f"Format: <code>1&2&3</code>\n"
+                    f"All Topics: <code>{id_list}</code>"
+                )
+                raw_text3 = input3.text.strip()
 
-        prog = await message.reply(
-            "🔄 <b>Processing Content</b>\n\n"
-            "├─ Status: Extracting content\n"
-            "└─ Please wait..."
-        )
-        threading.Thread(target=lambda: asyncio.run(careerdl(app, message, headers, raw_text2, token, raw_text3, prog, batch_name))).start()
+                prog = await message.reply(
+                    "🔄 <b>Processing Content</b>\n\n"
+                    "├─ Status: Extracting content\n"
+                    "└─ Please wait..."
+                )
+                threading.Thread(target=lambda: asyncio.run(careerdl(app, message, headers, raw_text2, token, raw_text3, prog, batch_name))).start()
+            except Exception as e:
+                await message.reply(f"❌ Error processing batch {raw_text2}: {str(e)}")
 
     except Exception as e:
         error_msg = (

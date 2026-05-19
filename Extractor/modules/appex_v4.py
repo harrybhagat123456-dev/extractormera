@@ -414,10 +414,10 @@ async def appex_v5_txt(app, message, api, name):
         "1️⃣ <b>sɪɴɢʟᴇ ʙᴀᴛᴄʜ:</b>\n"
         "   • sᴇɴᴅ ᴏɴᴇ ɪᴅ\n\n"
         "2️⃣ <b>ᴍᴜʟᴛɪᴘʟᴇ ʙᴀᴛᴄʜᴇs:</b>\n"
-        "   • sᴇᴘᴀʀᴀᴛᴇ ɪᴅs ᴡɪᴛʜ '&'\n"
-        "   • ᴇxᴀᴍᴘʟᴇ: <code>123&456&789</code>\n\n"
+        "   • sᴇᴘᴀʀᴀᴛᴇ ɪᴅs ᴡɪᴛʜ ','\n"
+        "   • ᴇxᴀᴍᴘʟᴇ: <code>123,456,789</code>\n\n"
         "📋 <b>ᴄᴏᴘʏ ᴀʟʟ ʙᴀᴛᴄʜᴇs:</b>\n"
-        f"<code>{('&').join(valid_ids)}</code>\n\n"
+        f"<code>{','.join(valid_ids)}</code>\n\n"
         "━━━━━━━━━━━━━━━━━━━━━"
     )
     
@@ -430,8 +430,8 @@ async def appex_v5_txt(app, message, api, name):
             await editable1.delete(True)
         return
 
-    batch_ids = input2.text.strip().split("&")
-    batch_ids = [batch.strip() for batch in batch_ids if batch.strip() in valid_ids]
+    batch_ids = [bid.strip() for bid in input2.text.strip().split(",") if bid.strip()]
+    batch_ids = [bid for bid in batch_ids if bid in valid_ids]
 
     if not batch_ids:
         await message.reply_text("**Invalid batch ID(s). Please send valid batch IDs from the list.**")
