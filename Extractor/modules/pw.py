@@ -331,105 +331,125 @@ async def pw_login(app, message):
 
         query_msg = await app.send_message(
             chat_id=message.chat.id, 
-            text=batch_text + "\n\n💡 **Please enter the Course ID to continue:**",
+            text=batch_text + "\n\n💡 **Enter Course ID(s). Separate multiple IDs with commas for multiple TXT files:**\n\nExample: `id1,id2,id3`",
             reply_markup=None
         )
         
-        target_id_msg = await app.ask(message.chat.id, text="🆔 **Enter the Course ID here:**")
-        target_id = target_id_msg.text.strip()
+        target_id_msg = await app.ask(message.chat.id, text="🆔 **Enter the Course ID(s) here:**")
+        target_ids = [tid.strip() for tid in target_id_msg.text.strip().split(",") if tid.strip()]
 
-
-        if target_id not in batch_map:
-            await message.reply_text("❌ **Invalid Course ID! Please try again.**")
+        # Validate all course IDs
+        invalid_ids = [tid for tid in target_ids if tid not in batch_map]
+        if invalid_ids:
+            await message.reply_text(f"❌ **Invalid Course ID(s):** {', '.join(invalid_ids)}\n**Please try again.**")
             return
 
-        batch_name = batch_map[target_id]
-        filename = f"{batch_name.replace('/', '_').replace(':', '_').replace('|', '_')}.txt"
-
-        await app.send_message(
-            chat_id=message.chat.id, 
-            text=f"🕵️ **Fetching details for Batch:** **{batch_name}**... Please wait!"
-        )
-        course_response = requests.get(
-            f"https://api.penpencil.co/v3/batches/{target_id}/details", 
-            headers=headers
-        ).json()
-        
-        subjects = course_response.get("data", {}).get("subjects", [])
-        if not subjects:
-            await message.reply_text("❌ **No subjects found for the selected course.**")
+        if not target_ids:
+            await message.reply_text("❌ **No Course IDs provided! Please try again.**")
             return
-
-        progress_msg = await app.send_message(
-            chat_id=message.chat.id, 
-            text="🚀 **Initializing High-Speed Extraction...**"
-        )
-
-        all_subjects_progress = {}
-        total_links = [0]  # Using list to make it mutable in subfunctions
-        all_links = []
-
-        async def update_progress():
-            progress_text = "📊 **Extraction Progress**\n\n"
-            for subject, status in all_subjects_progress.items():
-                icon = "✅" if status else "⏳"
-                progress_text += f"{icon} **{subject}**\n"
-            progress_text += f"\n📝 Total Links: {total_links[0]}"
-            await progress_msg.edit_text(progress_text)
-
-        start_time = time.time()
-        
-        # Process all subjects concurrently
-        async with aiohttp.ClientSession() as session:
-            tasks = []
-            for subject in subjects:
-                si = subject.get("_id")
-                sn = clean_text(subject.get("subject", ""))
-                all_subjects_progress[sn] = False
-                await update_progress()
-                
-                task = process_subject_content(session, target_id, si, headers, all_links, total_links, sn)
-                tasks.append(task)
-            
-            await asyncio.gather(*tasks)
-            
-            for sn in all_subjects_progress:
-                all_subjects_progress[sn] = True
-            await update_progress()
-
-        # Sort links by date in ascending order
-        all_links = sort_and_group_by_subject(all_links)
-
-        # Write all collected links to file
-        with open(filename, 'w', encoding='utf-8') as f:
-            for line in all_links:
-                f.write(line + "\n")
-            
-            f.write("\n━━━━━━━━━━━━━━━━━━━━━\n")
-            f.write("🌟 Join Us: @UGxPrivate\n")
-            f.write("━━━━━━━━━━━━━━━━━━━━━")
-
-        end_time = time.time()
-        extraction_time = end_time - start_time
 
         up = (f"**Login Succesfull for PW:** `{token}`")
         captionn = (f" App Name : Physics Wallah \n\n PURCHASED BATCHES : {batch_text}")
-        caption = (
-                 f"࿇ ══━━ 🏦 ━━══ ࿇\n\n"
-                 f"🌀 **Aᴘᴘ Nᴀᴍᴇ** : ᴘʜʏsɪᴄs ᴡᴀʟʟᴀʜ (𝗣𝘄)\n"
-                 f"============================\n\n"
-                 f"✳️**Bᴀᴛᴄʜ ID** : **{target_id}**\n"
-                 f"🎯 **Bᴀᴛᴄʜ Nᴀᴍᴇ** : `{batch_name}`\n"
-                 f"⚡ **Extraction Time**: {extraction_time:.2f}s\n\n"
-                 f"🌐 **Jᴏɪɴ Us** : {join}\n"
-                 f"❄️ **Dᴀᴛᴇ** : {time_new}")
-
-        await app.send_document(chat_id=message.chat.id, document=filename, caption=caption)
-        await app.send_document(PREMIUM_LOGS, document=filename, caption=captionn)
         await app.send_message(PREMIUM_LOGS, up)
+
+        # Process each course ID separately — each gets its own TXT file
+        for idx, target_id in enumerate(target_ids, 1):
+            batch_name = batch_map[target_id]
+            filename = f"{batch_name.replace('/', '_').replace(':', '_').replace('|', '_')}.txt"
+
+            if len(target_ids) > 1:
+                await app.send_message(
+                    chat_id=message.chat.id, 
+                    text=f"🕵️ **[{idx}/{len(target_ids)}] Fetching:** **{batch_name}**... Please wait!"
+                )
+            else:
+                await app.send_message(
+                    chat_id=message.chat.id, 
+                    text=f"🕵️ **Fetching details for Batch:** **{batch_name}**... Please wait!"
+                )
+
+            course_response = requests.get(
+                f"https://api.penpencil.co/v3/batches/{target_id}/details", 
+                headers=headers
+            ).json()
+            
+            subjects = course_response.get("data", {}).get("subjects", [])
+            if not subjects:
+                await message.reply_text(f"❌ **No subjects found for course:** {batch_name}")
+                continue
+
+            progress_msg = await app.send_message(
+                chat_id=message.chat.id, 
+                text=f"🚀 **Extracting:** {batch_name}"
+            )
+
+            all_subjects_progress = {}
+            total_links = [0]
+            all_links = []
+
+            async def update_progress():
+                progress_text = f"📊 **Extraction Progress — {batch_name}**\n\n"
+                for subject, status in all_subjects_progress.items():
+                    icon = "✅" if status else "⏳"
+                    progress_text += f"{icon} **{subject}**\n"
+                progress_text += f"\n📝 Total Links: {total_links[0]}"
+                await progress_msg.edit_text(progress_text)
+
+            start_time = time.time()
+            
+            # Process all subjects concurrently
+            async with aiohttp.ClientSession() as session:
+                tasks = []
+                for subject in subjects:
+                    si = subject.get("_id")
+                    sn = clean_text(subject.get("subject", ""))
+                    all_subjects_progress[sn] = False
+                    await update_progress()
+                    
+                    task = process_subject_content(session, target_id, si, headers, all_links, total_links, sn)
+                    tasks.append(task)
+                
+                await asyncio.gather(*tasks)
+                
+                for sn in all_subjects_progress:
+                    all_subjects_progress[sn] = True
+                await update_progress()
+
+            # Sort and group links by subject, oldest first
+            all_links = sort_and_group_by_subject(all_links)
+
+            # Write all collected links to file
+            with open(filename, 'w', encoding='utf-8') as f:
+                for line in all_links:
+                    f.write(line + "\n")
+                
+                f.write("\n━━━━━━━━━━━━━━━━━━━━━\n")
+                f.write("🌟 Join Us: @UGxPrivate\n")
+                f.write("━━━━━━━━━━━━━━━━━━━━━")
+
+            end_time = time.time()
+            extraction_time = end_time - start_time
+
+            caption = (
+                     f"࿇ ══━━ 🏦 ━━══ ࿇\n\n"
+                     f"🌀 **Aᴘᴘ Nᴀᴍᴇ** : ᴘʜʏsɪᴄs ᴡᴀʟʟᴀʜ (𝗣𝘄)\n"
+                     f"============================\n\n"
+                     f"✳️**Bᴀᴛᴄʜ ID** : **{target_id}**\n"
+                     f"🎯 **Bᴀᴛᴄʜ Nᴀᴍᴇ** : `{batch_name}`\n"
+                     f"⚡ **Extraction Time**: {extraction_time:.2f}s\n\n"
+                     f"🌐 **Jᴏɪɴ Us** : {join}\n"
+                     f"❄️ **Dᴀᴛᴇ** : {time_new}")
+
+            await app.send_document(chat_id=message.chat.id, document=filename, caption=caption)
+            await app.send_document(PREMIUM_LOGS, document=filename, caption=captionn)
+
+            # Cleanup file after sending
+            try:
+                os.remove(filename)
+            except:
+                pass
 
     except Exception as e:
         error_msg = str(e)
         error_msg = clean_text(error_msg[:200]) + "..." if len(error_msg) > 200 else clean_text(error_msg)
         await message.reply_text(f"❌ **An error occurred:** `{error_msg}`")
-            
